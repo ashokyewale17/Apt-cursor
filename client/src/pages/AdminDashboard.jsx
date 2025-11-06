@@ -120,7 +120,10 @@ const AdminDashboard = () => {
     // Real-time updates via Socket.io
     let socket;
     try {
-      socket = io(); // same-origin
+      socket = io(window.location.origin, {
+        transports: ['websocket', 'polling'],
+        withCredentials: false
+      });
       socket.emit('join', 'admin');
 
       socket.on('employeeCheckIn', (evt) => {
