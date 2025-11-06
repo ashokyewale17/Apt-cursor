@@ -188,11 +188,11 @@ router.post("/checkin", async (req, res) => {
       console.warn('Could not populate employee details:', populateError.message);
     }
     
-    // Emit socket event for real-time update
+    // Emit socket event for real-time update with canonical ObjectId
     const io = req.app.get('io');
     if (io) {
       io.emit('employeeCheckIn', {
-        employeeId: employeeId,
+        employeeId: String(employee._id),
         employeeName: attendanceRecord.employeeId?.name || 'Unknown',
         department: attendanceRecord.employeeId?.department || 'Unknown',
         checkInTime: attendanceRecord.inTime,
@@ -285,11 +285,11 @@ router.post("/checkout", async (req, res) => {
       console.warn('Could not populate employee details:', populateError.message);
     }
     
-    // Emit socket event for real-time update
+    // Emit socket event for real-time update with canonical ObjectId
     const io = req.app.get('io');
     if (io) {
       io.emit('employeeCheckOut', {
-        employeeId: employeeId,
+        employeeId: String(employee._id),
         employeeName: attendanceRecord.employeeId?.name || 'Unknown',
         department: attendanceRecord.employeeId?.department || 'Unknown',
         checkOutTime: attendanceRecord.outTime,
