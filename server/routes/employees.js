@@ -119,6 +119,26 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     
     // Remove password from response
     const employeeResponse = await Employee.findById(employee._id);
+
+    // Emit socket event so connected admins refresh immediately
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('employeeAdded', {
+          _id: employeeResponse._id,
+          name: employeeResponse.name,
+          email: employeeResponse.email,
+          department: employeeResponse.department,
+          position: employeeResponse.position,
+          role: employeeResponse.role,
+          phone: employeeResponse.phone,
+          isActive: employeeResponse.isActive
+        });
+      }
+    } catch (e) {
+      console.warn('Could not emit employeeAdded:', e.message);
+    }
+
     res.status(201).json(employeeResponse);
   } catch (error) {
     console.error('Error creating employee:', error);
