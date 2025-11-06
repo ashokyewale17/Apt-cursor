@@ -46,20 +46,24 @@ const AddEmployee = () => {
     }
 
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch("/api/employees", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           name: formData.name,
           email: formData.email,
-          employeeId: formData.employeeId,
+          // employeeId is not part of schema; omit to avoid validation issues
           department: formData.department,
           position: formData.position,
           phone: formData.phone,
-          role: formData.role,
+          role: (formData.role || 'Employee').toLowerCase() === 'admin' ? 'admin' : 'employee',
           password: formData.password,
-          hireDate: formData.hireDate,
-          salary: formData.salary,
+          // hireDate maps to Employee.dateOfJoining if needed; backend sets default
+          salary: formData.salary ? Number(formData.salary) : 0,
           address: formData.address
         }),
       });
