@@ -143,6 +143,9 @@ const AdminDashboard = () => {
         setRealEmployees(prev => prev.map(e => 
           String(e.id) === String(evt.employeeId) ? { ...e, status: 'active' } : e
         ));
+        setEmployeeStatus(prev => prev.map(e => 
+          String(e.id) === String(evt.employeeId) ? { ...e, status: 'active' } : e
+        ));
       });
 
       socket.on('employeeCheckOut', (evt) => {
@@ -158,6 +161,8 @@ const AdminDashboard = () => {
           },
           ...prev
         ]);
+        // Optionally mark as inactive or leave current status; here we keep as active
+        // but you can flip to 'inactive' if your UI expects that.
       });
     } catch (e) {
       console.warn('Socket initialization failed:', e.message);
