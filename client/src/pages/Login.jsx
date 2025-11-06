@@ -70,105 +70,30 @@ const Login = () => {
     setError('');
 
     try {
-      // Simulate API call - replace with actual API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Get employee data from localStorage or use default data
-      const getEmployeeData = () => {
-        try {
-          const savedEmployees = localStorage.getItem('realEmployees');
-          if (savedEmployees) {
-            return JSON.parse(savedEmployees);
-          }
-        } catch (error) {
-          console.log('No saved employee data found, using default');
-        }
-        
-        // Default employee database - same as in AdminDashboard
-        return [
-          {
-            id: 1,
-            name: 'Tushar Mhaskar',
-            email: 'tushar.mhaskar@company.com',
-            password: 'admin123',
-            department: 'Admin',
-            role: 'Admin & HR',
-            isAdmin: true
-          },
-          {
-            id: 2,
-            name: 'Vijay Solanki',
-            email: 'vijay.solanki@company.com',
-            password: 'test123',
-            department: 'Testing',
-            role: 'QA Engineer'
-          },
-          {
-            id: 3,
-            name: 'Pinky Chakrabarty',
-            email: 'pinky.chakrabarty@company.com',
-            password: 'ops123',
-            department: 'Operations',
-            role: 'Operations Manager'
-          },
-          {
-            id: 4,
-            name: 'Sanket Pawal',
-            email: 'sanket.pawal@company.com',
-            password: 'design123',
-            department: 'Design',
-            role: 'UI/UX Designer'
-          },
-          {
-            id: 5,
-            name: 'Ashok Yewale',
-            email: 'ashok.yewale@company.com',
-            password: 'soft123',
-            department: 'Software',
-            role: 'Software Developer'
-          },
-          {
-            id: 6,
-            name: 'Harshal Lohar',
-            email: 'harshal.lohar@company.com',
-            password: 'soft123',
-            department: 'Software',
-            role: 'Senior Developer'
-          },
-          {
-            id: 7,
-            name: 'Prasanna Pandit',
-            email: 'prasanna.pandit@company.com',
-            password: 'embed123',
-            department: 'Embedded',
-            role: 'Embedded Engineer'
-          }
-        ];
-      };
-      
-      const employees = getEmployeeData();
-      
-      // Check against employee database (including newly added employees)
-      const user = employees.find(emp => 
-        emp.email.toLowerCase() === formData.email.toLowerCase() && 
-        emp.password === formData.password
-      );
-      
-      if (user) {
-        const userData = {
-          id: user.id.toString(),
-          name: user.name,
-          email: user.email,
-          role: user.isAdmin ? 'admin' : 'employee',
-          position: user.role,
-          department: user.department
-        };
-        login(userData, `mock-token-${user.id}`);
-      } else {
-        setError('Invalid email or password');
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, password: formData.password })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data?.message || 'Login failed');
       }
+
+      const apiUser = data.user;
+      // Keep backward-compat id for existing components
+      const userData = {
+        _id: apiUser._id,
+        id: apiUser._id, // compatibility for parts using user.id
+        name: apiUser.name,
+        email: apiUser.email,
+        role: apiUser.role,
+        position: apiUser.position,
+        department: apiUser.department
+      };
+      login(userData, data.token);
     } catch (err) {
-      setError('Login failed. Please try again.');
+      setError(err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -177,7 +102,7 @@ const Login = () => {
   const fillDemoCredentials = (type) => {
     if (type === 'admin') {
       setFormData({
-        email: 'tushar.mhaskar@company.com',
+        email: 'admin@company.com',
         password: 'admin123'
       });
     } else {

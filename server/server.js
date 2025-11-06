@@ -158,6 +158,39 @@ const startServer = async () => {
       
       // Create default admin after server starts
       setTimeout(createDefaultAdmin, 2000);
+
+      // Seed demo employees (7 users) after server starts
+      setTimeout(async () => {
+        try {
+          const mongoose = require('mongoose');
+          if (mongoose.connection.readyState !== 1) {
+            console.log('Skipping demo employee seeding - database not connected');
+            return;
+          }
+          const Employee = require('./models/Employee');
+
+          const demoEmployees = [
+            { name: 'Tushar Mhaskar', email: 'admin@company.com', password: 'admin123', department: 'Admin', position: 'Admin & HR', role: 'admin', salary: 80000, phone: '+1234567891', address: '123 Admin St, City, State' },
+            { name: 'Vijay Solanki', email: 'vijay.solanki@company.com', password: 'test123', department: 'Testing', position: 'QA Engineer', role: 'employee', salary: 60000, phone: '+1234567892', address: '124 Test St, City, State' },
+            { name: 'Pinky Chakrabarty', email: 'pinky.chakrabarty@company.com', password: 'ops123', department: 'Operations', position: 'Operations Manager', role: 'employee', salary: 65000, phone: '+1234567893', address: '125 Ops St, City, State' },
+            { name: 'Sanket Pawal', email: 'sanket.pawal@company.com', password: 'design123', department: 'Design', position: 'UI/UX Designer', role: 'employee', salary: 70000, phone: '+1234567894', address: '126 Design St, City, State' },
+            { name: 'Ashok Yewale', email: 'ashok.yewale@company.com', password: 'soft123', department: 'Software', position: 'Software Developer', role: 'employee', salary: 75000, phone: '+1234567895', address: '127 Software St, City, State' },
+            { name: 'Harshal Lohar', email: 'harshal.lohar@company.com', password: 'soft123', department: 'Software', position: 'Senior Developer', role: 'employee', salary: 85000, phone: '+1234567896', address: '128 Senior St, City, State' },
+            { name: 'Prasanna Pandit', email: 'prasanna.pandit@company.com', password: 'embed123', department: 'Embedded', position: 'Embedded Engineer', role: 'employee', salary: 80000, phone: '+1234567897', address: '129 Embedded St, City, State' }
+          ];
+
+          for (const emp of demoEmployees) {
+            const exists = await Employee.findOne({ email: emp.email });
+            if (!exists) {
+              const e = new Employee(emp);
+              await e.save();
+              console.log(`Seeded employee: ${emp.name} (${emp.email})`);
+            }
+          }
+        } catch (seedErr) {
+          console.error('Error seeding demo employees:', seedErr.message);
+        }
+      }, 3000);
     });
 
     // Export io for use in other modules

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { io } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { 
@@ -80,12 +81,88 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     loadDashboardData();
+    // Load real employees from API
+    const fetchEmployees = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const resp = await fetch('/api/employees?page=1&limit=100', {
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : undefined
+          }
+        });
+        const data = await resp.json();
+        if (resp.ok && Array.isArray(data.employees)) {
+          // Normalize to match existing UI shape minimally
+          const normalized = data.employees.map(e => ({
+            id: e._id,
+            name: e.name,
+            email: e.email,
+            department: e.department,
+            role: e.position,
+            status: e.isActive ? 'active' : 'inactive',
+            phone: e.phone
+          }));
+          setRealEmployees(normalized);
+          try { localStorage.setItem('realEmployees', JSON.stringify(normalized)); } catch {}
+        }
+      } catch (err) {
+        console.error('Failed to fetch employees:', err);
+      }
+    };
+    fetchEmployees();
     generateAnalyticsData();
     
     // Immediately check for any recent check-ins after loading data
     setTimeout(() => {
       checkForEmployeeCheckIns();
     }, 1000);
+
+    // Real-time updates via Socket.io
+    let socket;
+    try {
+      socket = io(); // same-origin
+      socket.emit('join', 'admin');
+
+      socket.on('employeeCheckIn', (evt) => {
+        // Update recent activity and mark employee status to active
+        setRecentActivity(prev => [
+          {
+            id: Date.now(),
+            type: 'check-in',
+            employee: evt.employeeName || 'Unknown',
+            department: evt.department || 'Unknown',
+            time: new Date(evt.checkInTime || Date.now()),
+            status: 'success',
+            avatar: (evt.employeeName || 'U').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()
+          },
+          ...prev
+        ]);
+        setRealEmployees(prev => prev.map(e => e.name === evt.employeeName ? { ...e, status: 'active' } : e));
+      });
+
+      socket.on('employeeCheckOut', (evt) => {
+        setRecentActivity(prev => [
+          {
+            id: Date.now(),
+            type: 'check-out',
+            employee: evt.employeeName || 'Unknown',
+            department: evt.department || 'Unknown',
+            time: new Date(evt.checkOutTime || Date.now()),
+            status: 'success',
+            avatar: (evt.employeeName || 'U').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()
+          },
+          ...prev
+        ]);
+      });
+    } catch (e) {
+      console.warn('Socket initialization failed:', e.message);
+    }
+
+    return () => {
+      if (socket) {
+        socket.disconnect();
+      }
+    };
   }, []);
 
   
@@ -340,7 +417,7 @@ const AdminDashboard = () => {
       {
         id: 1,
         name: 'Tushar Mhaskar',
-        email: 'tushar.mhaskar@company.com',
+        email: 'admin@company.com',
         password: 'admin123', // In real app, this should be hashed
         department: 'Admin',
         role: 'Admin & HR',
@@ -2813,7 +2890,7 @@ const AdminDashboard = () => {
                           className="btn btn-sm btn-outline"
                           style={{ fontSize: '0.75rem' }}
                         >
-                          <Phone size={12} style={{ marginRight: '0.25rem' }} />
+                          <Phone size={12} style={{ marginRight: '0.25rem }} />
                           Contact
                         </button>
                       </div>

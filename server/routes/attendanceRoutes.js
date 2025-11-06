@@ -39,7 +39,7 @@ const findEmployeeByAnyId = async (id) => {
       // SPECIAL CASE FOR MOCK SYSTEM:
       // For numeric IDs 1-7, directly return the corresponding employee by email
       const mockEmails = {
-        "1": "tushar.mhaskar@company.com",
+        "1": "admin@company.com",
         "2": "vijay.solanki@company.com",
         "3": "pinky.chakrabarty@company.com",
         "4": "sanket.pawal@company.com",
@@ -53,7 +53,7 @@ const findEmployeeByAnyId = async (id) => {
         // If employee doesn't exist, create them
         if (!employee) {
           const mockEmployeeData = {
-            "1": { name: 'Tushar Mhaskar', email: 'tushar.mhaskar@company.com', password: 'admin123', department: 'Admin', position: 'Admin & HR', role: 'admin', salary: 80000, phone: '+1234567891', address: '123 Admin St, City, State' },
+            "1": { name: 'Tushar Mhaskar', email: 'admin@company.com', password: 'admin123', department: 'Admin', position: 'Admin & HR', role: 'admin', salary: 80000, phone: '+1234567891', address: '123 Admin St, City, State' },
             "2": { name: 'Vijay Solanki', email: 'vijay.solanki@company.com', password: 'test123', department: 'Testing', position: 'QA Engineer', role: 'employee', salary: 60000, phone: '+1234567892', address: '124 Test St, City, State' },
             "3": { name: 'Pinky Chakrabarty', email: 'pinky.chakrabarty@company.com', password: 'ops123', department: 'Operations', position: 'Operations Manager', role: 'employee', salary: 65000, phone: '+1234567893', address: '125 Ops St, City, State' },
             "4": { name: 'Sanket Pawal', email: 'sanket.pawal@company.com', password: 'design123', department: 'Design', position: 'UI/UX Designer', role: 'employee', salary: 70000, phone: '+1234567894', address: '126 Design St, City, State' },
