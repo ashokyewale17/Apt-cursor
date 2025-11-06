@@ -2890,7 +2890,7 @@ const AdminDashboard = () => {
                           className="btn btn-sm btn-outline"
                           style={{ fontSize: '0.75rem' }}
                         >
-                          <Phone size={12} style={{ marginRight: '0.25rem }} />
+                          <Phone size={12} style={{ marginRight: '0.25rem' }} />
                           Contact
                         </button>
                       </div>

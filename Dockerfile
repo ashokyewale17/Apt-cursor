@@ -1,7 +1,7 @@
 # Multi-stage build for production deployment
 
 # Stage 1: Build React frontend
-FROM node:20.11-alpine3.19 AS frontend-build
+FROM node:22.12-alpine3.20 AS frontend-build
 WORKDIR /app/client
 
 # Update packages for security
@@ -12,15 +12,15 @@ RUN apk update && \
 
 # Copy frontend package files
 COPY client/package*.json ./
-RUN npm ci --only=production --ignore-scripts
+# Install with dev dependencies for build
+RUN npm ci
 
 # Copy frontend source and build
 COPY client/ ./
-RUN npm install vite
 RUN npm run build
 
 # Stage 2: Setup backend  
-FROM node:20.11-alpine3.19 AS backend-build
+FROM node:22.12-alpine3.20 AS backend-build
 WORKDIR /app/server
 
 # Update packages for security
@@ -37,7 +37,7 @@ RUN npm ci --only=production --ignore-scripts
 COPY server/ ./
 
 # Stage 3: Production image
-FROM node:20.11-alpine3.19 AS production
+FROM node:22.12-alpine3.20 AS production
 
 # Update packages for security
 RUN apk update && \
