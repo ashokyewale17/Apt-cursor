@@ -140,7 +140,9 @@ const AdminDashboard = () => {
           },
           ...prev
         ]);
-        setRealEmployees(prev => prev.map(e => e.name === evt.employeeName ? { ...e, status: 'active' } : e));
+        setRealEmployees(prev => prev.map(e => 
+          String(e.id) === String(evt.employeeId) ? { ...e, status: 'active' } : e
+        ));
       });
 
       socket.on('employeeCheckOut', (evt) => {
