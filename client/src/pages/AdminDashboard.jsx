@@ -54,6 +54,7 @@ const AdminDashboard = () => {
   const [employeeStatus, setEmployeeStatus] = useState([]);
   const [realEmployees, setRealEmployees] = useState([]);
   const [attendanceChart, setAttendanceChart] = useState([]);
+  const [weeklyAttendanceData, setWeeklyAttendanceData] = useState(new Map()); // Map of employeeId -> weekly data
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
@@ -231,6 +232,115 @@ const AdminDashboard = () => {
     }
   }, [updateEmployeeStatusFromDatabase]);
 
+  // Load weekly attendance data for all employees
+  const loadWeeklyAttendanceData = useCallback(async () => {
+    if (realEmployees.length === 0) return;
+    
+    try {
+      const today = new Date();
+      const month = today.getMonth() + 1;
+      const year = today.getFullYear();
+      
+      // Fetch attendance data for all employees in parallel
+      const attendancePromises = realEmployees.map(async (employee) => {
+        try {
+          const response = await fetch(`/api/attendance-records/employee/${employee.id}/${month}/${year}`);
+          const records = response.ok ? await response.json() : [];
+          
+          // Process last 7 days
+          const weeklyData = Array.from({ length: 7 }, (_, i) => {
+            const date = subDays(new Date(), 6 - i);
+            const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+            const isToday = date.toDateString() === today.toDateString();
+            const dateKey = format(date, 'yyyy-MM-dd');
+            
+            if (isWeekend) {
+              return {
+                date: format(date, 'EEE'),
+                status: 'weekend',
+                fullDate: dateKey
+              };
+            }
+            
+            // Find record for this date
+            const record = records.find(r => {
+              const recordDate = new Date(r.date);
+              return format(recordDate, 'yyyy-MM-dd') === dateKey;
+            });
+            
+            if (record) {
+              const dbStatus = record.status || 'Present';
+              let status = 'absent';
+              
+              if (dbStatus === 'Leave' || dbStatus === 'Holiday' || dbStatus === 'Absent') {
+                status = 'absent';
+              } else if (record.inTime) {
+                // Determine if late (check-in after 9:30 AM)
+                const inTimeDate = new Date(record.inTime);
+                const lateThreshold = new Date(inTimeDate);
+                lateThreshold.setHours(9, 30, 0, 0);
+                const isLate = inTimeDate > lateThreshold;
+                
+                if (record.outTime) {
+                  // Completed day
+                  status = isLate ? 'late' : 'present';
+                } else {
+                  // Active day (checked in but not out)
+                  if (isToday) {
+                    status = isLate ? 'late' : 'present';
+                  } else {
+                    status = 'present'; // Past day without check-out
+                  }
+                }
+              }
+              
+              return {
+                date: format(date, 'EEE'),
+                status,
+                fullDate: dateKey,
+                isToday
+              };
+            }
+            
+            // No record found
+            // Check if it's today and employee is active
+            if (isToday && (employee.status === 'active' || employee.status === 'completed')) {
+              return {
+                date: format(date, 'EEE'),
+                status: employee.status === 'late' ? 'late' : 'present',
+                fullDate: dateKey,
+                isToday: true
+              };
+            }
+            
+            return {
+              date: format(date, 'EEE'),
+              status: 'absent',
+              fullDate: dateKey,
+              isToday
+            };
+          });
+          
+          return { employeeId: employee.id, weeklyData };
+        } catch (error) {
+          console.error(`Error fetching weekly data for employee ${employee.id}:`, error);
+          return { employeeId: employee.id, weeklyData: [] };
+        }
+      });
+      
+      const results = await Promise.all(attendancePromises);
+      const dataMap = new Map();
+      results.forEach(({ employeeId, weeklyData }) => {
+        dataMap.set(employeeId, weeklyData);
+      });
+      
+      setWeeklyAttendanceData(dataMap);
+      console.log('✅ Loaded weekly attendance data for', results.length, 'employees');
+    } catch (error) {
+      console.error('Error loading weekly attendance data:', error);
+    }
+  }, [realEmployees]);
+
   useEffect(() => {
     loadDashboardData();
     // Load real employees from API
@@ -378,40 +488,59 @@ const AdminDashboard = () => {
 
   
 
-  // Update attendance data when component updates
+  // Load weekly attendance data when employees are loaded
   useEffect(() => {
     if (realEmployees.length > 0) {
-      // Regenerate weekly attendance data - only present and absent, excluding weekends
-      const generateWeeklyAttendanceData = () => {
+      loadWeeklyAttendanceData();
+      
+      // Also update the chart data (aggregated view)
+      const updateChartData = () => {
         const last7Days = Array.from({ length: 7 }, (_, i) => {
           const date = subDays(new Date(), 6 - i);
-          // Check if it's a weekend (0 = Sunday, 6 = Saturday)
           const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+          const dateKey = format(date, 'yyyy-MM-dd');
           
           if (isWeekend) {
-            // For weekends, show 0 present and 0 absent
             return {
-              date: format(date, 'EEE'), // Show day of week instead of date
+              date: format(date, 'EEE'),
               present: 0,
               absent: 0
             };
-          } else {
-            // For weekdays, generate realistic attendance data
-            const basePresent = Math.max(1, realEmployees.length - Math.floor(Math.random() * 2)); // Most employees present
-            return {
-              date: format(date, 'EEE'), // Show day of week instead of date
-              present: basePresent,
-              absent: Math.min(realEmployees.length - basePresent, Math.floor(Math.random() * 2))
-            };
           }
+          
+          // Count present/absent from weeklyAttendanceData
+          let present = 0;
+          let absent = 0;
+          
+          weeklyAttendanceData.forEach((weeklyData) => {
+            const dayData = weeklyData.find(d => d.fullDate === dateKey);
+            if (dayData) {
+              if (dayData.status === 'present' || dayData.status === 'late') {
+                present++;
+              } else if (dayData.status === 'absent') {
+                absent++;
+              }
+            } else {
+              absent++;
+            }
+          });
+          
+          return {
+            date: format(date, 'EEE'),
+            present,
+            absent
+          };
         });
-        return last7Days;
+        
+        setAttendanceChart(last7Days);
       };
       
-      const weeklyAttendanceData = generateWeeklyAttendanceData();
-      setAttendanceChart(weeklyAttendanceData);
+      // Update chart when weekly data changes
+      if (weeklyAttendanceData.size > 0) {
+        updateChartData();
+      }
     }
-  }, [realEmployees]);
+  }, [realEmployees, weeklyAttendanceData, loadWeeklyAttendanceData]);
 
   useEffect(() => {
     // Set up real-time polling once on component mount
@@ -1604,8 +1733,9 @@ const AdminDashboard = () => {
               marginBottom: '1rem'
             }}>
               {realEmployees.map((employee) => {
-                // Generate real-time weekly attendance data for this employee
-                const weeklyData = Array.from({ length: 7 }, (_, i) => {
+                // Get real weekly attendance data from database
+                const weeklyData = weeklyAttendanceData.get(employee.id) || Array.from({ length: 7 }, (_, i) => {
+                  // Fallback: generate empty data if not loaded yet
                   const date = subDays(new Date(), 6 - i);
                   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
                   const today = new Date();
@@ -1617,33 +1747,30 @@ const AdminDashboard = () => {
                       status: 'weekend',
                       fullDate: format(date, 'yyyy-MM-dd')
                     };
-                  } else {
-                    // For real-time data, check actual employee status
-                    let status = 'absent'; // default
-                    
-                    // Check if this is today and employee has checked in
-                    if (isToday) {
-                      if (employee.status === 'active' || employee.status === 'completed') {
-                        status = employee.status === 'late' ? 'late' : 'present';
-                      } else if (employee.status === 'late') {
-                        status = 'late';
-                      } else {
-                        status = 'absent';
-                      }
-                    } else {
-                      // For past days, use simulated data
-                      const isPresent = Math.random() > 0.1; // 90% attendance rate
-                      const isLate = isPresent && Math.random() < 0.2; // 20% of present days are late
-                      status = isPresent ? (isLate ? 'late' : 'present') : 'absent';
+                  }
+                  
+                  // For today, check employee status
+                  if (isToday) {
+                    let status = 'absent';
+                    if (employee.status === 'active' || employee.status === 'completed') {
+                      status = employee.status === 'late' ? 'late' : 'present';
+                    } else if (employee.status === 'late') {
+                      status = 'late';
                     }
-                    
                     return {
                       date: format(date, 'EEE'),
-                      status: status,
+                      status,
                       fullDate: format(date, 'yyyy-MM-dd'),
-                      isToday: isToday
+                      isToday: true
                     };
                   }
+                  
+                  return {
+                    date: format(date, 'EEE'),
+                    status: 'absent',
+                    fullDate: format(date, 'yyyy-MM-dd'),
+                    isToday: false
+                  };
                 });
                 
                 const presentCount = weeklyData.filter(d => d.status === 'present').length;
