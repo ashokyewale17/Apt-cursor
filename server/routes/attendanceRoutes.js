@@ -318,7 +318,70 @@ router.post("/checkout", async (req, res) => {
   }
 });
 
+// Get today's attendance records for all employees (for admin dashboard)
+// IMPORTANT: This route must come BEFORE /today/:employeeId to avoid route conflicts
+router.get("/today/all", async (req, res) => {
+  try {
+    console.log('Today attendance for all employees request received');
+    
+    // Set cache-control headers to prevent caching
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    
+    // Get today's date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Find all attendance records for today
+    const attendanceRecords = await Attendance.find({
+      date: today
+    }).populate('employeeId', 'name department email');
+    
+    // Format the response
+    const formattedRecords = attendanceRecords.map(record => {
+      let hoursWorked = '0:00';
+      let status = 'active';
+      
+      if (record.outTime) {
+        // Calculate hours worked
+        const checkInTime = new Date(record.inTime);
+        const checkOutTime = new Date(record.outTime);
+        const diffMs = checkOutTime - checkInTime;
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        hoursWorked = `${diffHours}:${diffMinutes.toString().padStart(2, '0')}`;
+        status = 'completed';
+      }
+      
+      return {
+        employeeId: String(record.employeeId._id),
+        employeeName: record.employeeId.name,
+        department: record.employeeId.department,
+        email: record.employeeId.email,
+        checkInTime: record.inTime,
+        checkOutTime: record.outTime || null,
+        hoursWorked: hoursWorked,
+        status: status,
+        location: record.location || 'Office'
+      };
+    });
+    
+    res.json({
+      success: true,
+      records: formattedRecords,
+      date: today
+    });
+  } catch (error) {
+    console.error('Error in GET /today/all:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get today's attendance status for an employee
+// IMPORTANT: This route must come AFTER /today/all to avoid route conflicts
 router.get("/today/:employeeId", async (req, res) => {
   try {
     const { employeeId } = req.params;
@@ -416,67 +479,6 @@ router.get("/employee/:empId/:month/:year", async (req, res) => {
     res.json(records);
   } catch (error) {
     console.error('Error in GET /employee/:empId/:month/:year:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get today's attendance records for all employees (for admin dashboard)
-router.get("/today/all", async (req, res) => {
-  try {
-    console.log('Today attendance for all employees request received');
-    
-    // Set cache-control headers to prevent caching
-    res.set({
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    });
-    
-    // Get today's date
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    // Find all attendance records for today
-    const attendanceRecords = await Attendance.find({
-      date: today
-    }).populate('employeeId', 'name department email');
-    
-    // Format the response
-    const formattedRecords = attendanceRecords.map(record => {
-      let hoursWorked = '0:00';
-      let status = 'active';
-      
-      if (record.outTime) {
-        // Calculate hours worked
-        const checkInTime = new Date(record.inTime);
-        const checkOutTime = new Date(record.outTime);
-        const diffMs = checkOutTime - checkInTime;
-        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-        const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        hoursWorked = `${diffHours}:${diffMinutes.toString().padStart(2, '0')}`;
-        status = 'completed';
-      }
-      
-      return {
-        employeeId: String(record.employeeId._id),
-        employeeName: record.employeeId.name,
-        department: record.employeeId.department,
-        email: record.employeeId.email,
-        checkInTime: record.inTime,
-        checkOutTime: record.outTime || null,
-        hoursWorked: hoursWorked,
-        status: status,
-        location: record.location || 'Office'
-      };
-    });
-    
-    res.json({
-      success: true,
-      records: formattedRecords,
-      date: today
-    });
-  } catch (error) {
-    console.error('Error in GET /today/all:', error);
     res.status(500).json({ error: error.message });
   }
 });
