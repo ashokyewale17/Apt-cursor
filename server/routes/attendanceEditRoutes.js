@@ -171,19 +171,26 @@ router.put("/edit-request/:id/:action", authenticateToken, async (req, res) => {
     if (action === "approve") {
       const attendance = editRequest.attendanceId;
       
+      // Use the attendance record's date to ensure consistency
+      // Create a new Date object from the attendance date and reset time to midnight
+      const attendanceDate = new Date(attendance.date);
+      attendanceDate.setHours(0, 0, 0, 0);
+      
       // Convert time strings to Date objects
       if (editRequest.requestedInTime) {
-        // Parse time string (HH:mm format) and combine with the date
+        // Parse time string (HH:mm format) and combine with the attendance date
         const [hours, minutes] = editRequest.requestedInTime.split(':').map(Number);
-        const inTimeDate = new Date(editRequest.date);
+        const inTimeDate = new Date(attendanceDate);
+        // Set the time using local timezone (this is correct for attendance times)
         inTimeDate.setHours(hours || 0, minutes || 0, 0, 0);
         attendance.inTime = inTimeDate;
       }
       
       if (editRequest.requestedOutTime) {
-        // Parse time string (HH:mm format) and combine with the date
+        // Parse time string (HH:mm format) and combine with the attendance date
         const [hours, minutes] = editRequest.requestedOutTime.split(':').map(Number);
-        const outTimeDate = new Date(editRequest.date);
+        const outTimeDate = new Date(attendanceDate);
+        // Set the time using local timezone (this is correct for attendance times)
         outTimeDate.setHours(hours || 0, minutes || 0, 0, 0);
         attendance.outTime = outTimeDate;
       }
@@ -196,8 +203,13 @@ router.put("/edit-request/:id/:action", authenticateToken, async (req, res) => {
       await attendance.save();
       
       console.log(`✅ Updated attendance record ${attendance._id} with new times:`, {
+        date: attendance.date,
         inTime: attendance.inTime,
-        outTime: attendance.outTime
+        outTime: attendance.outTime,
+        requestedInTime: editRequest.requestedInTime,
+        requestedOutTime: editRequest.requestedOutTime,
+        inTimeFormatted: attendance.inTime ? new Date(attendance.inTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
+        outTimeFormatted: attendance.outTime ? new Date(attendance.outTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : null
       });
     }
 
