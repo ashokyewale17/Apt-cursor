@@ -802,7 +802,13 @@ const AdminDashboard = () => {
       
       if (response.ok && data.success && Array.isArray(data.records)) {
         console.log('✅ Fetched', data.records.length, 'employee attendance records');
-        console.log('📅 Sample record:', data.records[0]);
+        if (data.records.length > 0) {
+          console.log('📅 Sample record (full):', JSON.stringify(data.records[0], null, 2));
+          console.log('📅 Sample record records array:', data.records[0].records);
+          if (data.records[0].records && data.records[0].records.length > 0) {
+            console.log('📅 Sample day record:', JSON.stringify(data.records[0].records[0], null, 2));
+          }
+        }
         
         const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
         
@@ -825,7 +831,8 @@ const AdminDashboard = () => {
           
           console.log(`📅 Processing employee ${employee.name} (ID: ${empId})`, {
             hasApiData: !!apiData,
-            recordCount: apiData ? apiData.records.length : 0
+            recordCount: apiData ? apiData.records.length : 0,
+            sampleRecord: apiData && apiData.records.length > 0 ? apiData.records[0] : null
           });
           
           // Initialize arrays for all days in month
@@ -837,8 +844,10 @@ const AdminDashboard = () => {
           // Create a map of day -> record from API data
           const dayRecordMap = new Map();
           if (apiData && apiData.records) {
+            console.log(`📅 Employee ${employee.name} - Raw records:`, apiData.records);
             apiData.records.forEach(record => {
               dayRecordMap.set(record.date, record);
+              console.log(`📅 Mapped day ${record.date} for ${employee.name}:`, record);
             });
           }
           
@@ -871,6 +880,7 @@ const AdminDashboard = () => {
               
               if (dayRecord) {
                 // We have actual attendance data
+                console.log(`📅 Day ${day} for ${employee.name}: Found record`, dayRecord);
                 attendanceRecords.push(dayRecord);
                 
                 if (dayRecord.status === 'present' || dayRecord.status === 'late') {
@@ -880,6 +890,10 @@ const AdminDashboard = () => {
                   leaveDays++;
                 }
               } else {
+                // No record found - mark as absent (only log for first few days to avoid spam)
+                if (day <= 5) {
+                  console.log(`📅 Day ${day} for ${employee.name}: No record found - marking as absent`);
+                }
                 // No record found - mark as absent
                 attendanceRecords.push({
                   date: day,
@@ -920,8 +934,21 @@ const AdminDashboard = () => {
         console.log('📅 Monthly data summary:', monthlyData.map(emp => ({
           name: emp.employee.name,
           presentDays: emp.summary.presentDays,
-          recordsCount: emp.attendanceRecords.length
+          leaveDays: emp.summary.leaveDays,
+          totalHours: emp.summary.totalHours,
+          recordsCount: emp.attendanceRecords.length,
+          sampleRecords: emp.attendanceRecords.slice(0, 3) // First 3 records
         })));
+        
+        // Log a sample employee's full data
+        if (monthlyData.length > 0) {
+          const sampleEmp = monthlyData[0];
+          console.log('📅 Sample employee full data:', {
+            name: sampleEmp.employee.name,
+            summary: sampleEmp.summary,
+            first5Records: sampleEmp.attendanceRecords.slice(0, 5)
+          });
+        }
       } else {
         console.error('❌ Failed to fetch monthly attendance:', data.error || 'Unknown error');
         console.error('❌ Response status:', response.status);
