@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
@@ -79,6 +79,122 @@ const AdminDashboard = () => {
   });
   const [viewMode, setViewMode] = useState('table'); // Add viewMode state - default to 'table'
 
+  // Function to update employee status from database records
+  const updateEmployeeStatusFromDatabase = useCallback((attendanceRecords) => {
+    setRealEmployees(prevEmployees => {
+      // Create a map of employeeId to attendance record for quick lookup
+      const attendanceMap = new Map();
+      attendanceRecords.forEach(record => {
+        attendanceMap.set(record.employeeId, record);
+      });
+      
+      // Update each employee based on database records
+      const updatedEmployees = prevEmployees.map(emp => {
+        const attendanceRecord = attendanceMap.get(String(emp.id));
+        
+        if (attendanceRecord) {
+          // Employee has checked in today
+          const checkInTime = new Date(attendanceRecord.checkInTime);
+          const checkInFormatted = format(checkInTime, 'HH:mm');
+          
+          if (attendanceRecord.checkOutTime) {
+            // Employee has checked out
+            return {
+              ...emp,
+              status: 'completed',
+              checkIn: checkInFormatted,
+              location: attendanceRecord.location || 'Office',
+              hours: attendanceRecord.hoursWorked
+            };
+          } else {
+            // Employee is currently checked in
+            return {
+              ...emp,
+              status: 'active',
+              checkIn: checkInFormatted,
+              location: attendanceRecord.location || 'Office',
+              hours: '0:00'
+            };
+          }
+        } else {
+          // Employee hasn't checked in today - mark as absent if they were previously active
+          return {
+            ...emp,
+            status: emp.status === 'active' ? 'absent' : emp.status,
+            checkIn: emp.status === 'active' ? '-' : (emp.checkIn || '-'),
+            hours: emp.status === 'active' ? '0:00' : (emp.hours || '0:00')
+          };
+        }
+      });
+      
+      // Update employee status state
+      setEmployeeStatus(updatedEmployees);
+      
+      // Calculate updated stats
+      const activeCount = updatedEmployees.filter(emp => emp.status === 'active' || emp.status === 'completed').length;
+      const leaveCount = updatedEmployees.filter(emp => emp.status === 'leave').length;
+      const absentCount = updatedEmployees.filter(emp => emp.status === 'absent').length;
+      
+      setStats(prev => ({
+        ...prev,
+        totalEmployees: updatedEmployees.length,
+        activeToday: activeCount,
+        onLeave: leaveCount,
+        absentToday: absentCount,
+        attendanceRate: updatedEmployees.length > 0 ? ((activeCount / updatedEmployees.length) * 100).toFixed(1) : '0'
+      }));
+      
+      return updatedEmployees;
+    });
+  }, []);
+
+  // Real-time check for employee check-ins (optimized to prevent spam)
+  const checkForEmployeeCheckIns = useCallback(async () => {
+    try {
+      console.log('🔄 Polling for attendance updates...');
+      // Fetch today's attendance records from database
+      const response = await fetch('/api/attendance-records/today/all');
+      const data = await response.json();
+      
+      if (response.ok && data.success && Array.isArray(data.records)) {
+        console.log('📊 Fetched', data.records.length, 'attendance records from database');
+        
+        // Update employee status based on database records
+        updateEmployeeStatusFromDatabase(data.records);
+        
+        // Update recent activity with new check-ins/check-outs
+        const newActivities = data.records
+          .filter(record => {
+            // Only show records from the last hour to avoid cluttering
+            const recordTime = new Date(record.checkInTime);
+            return Date.now() - recordTime.getTime() < 3600000; // 1 hour
+          })
+          .map(record => ({
+            id: `${record.employeeId}_${record.checkInTime}`,
+            type: record.checkOutTime ? 'check-out' : 'check-in',
+            employee: record.employeeName,
+            department: record.department,
+            time: new Date(record.checkOutTime || record.checkInTime),
+            status: 'success',
+            avatar: record.employeeName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+          }));
+        
+        if (newActivities.length > 0) {
+          setRecentActivity(prev => {
+            // Merge with existing activities, avoiding duplicates
+            const existingIds = new Set(prev.map(a => a.id));
+            const uniqueNew = newActivities.filter(a => !existingIds.has(a.id));
+            return [...uniqueNew, ...prev].slice(0, 15);
+          });
+        }
+      } else {
+        console.error('Failed to fetch attendance records:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching attendance records:', error);
+    }
+  }, [updateEmployeeStatusFromDatabase]);
+
   useEffect(() => {
     loadDashboardData();
     // Load real employees from API
@@ -122,9 +238,24 @@ const AdminDashboard = () => {
     try {
       socket = io(window.location.origin, {
         transports: ['websocket', 'polling'],
-        withCredentials: false
+        withCredentials: false,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5
       });
-      socket.emit('join', 'admin');
+      
+      socket.on('connect', () => {
+        console.log('✅ Socket.io connected:', socket.id);
+        socket.emit('join', 'admin');
+      });
+
+      socket.on('disconnect', () => {
+        console.log('❌ Socket.io disconnected');
+      });
+
+      socket.on('connect_error', (error) => {
+        console.error('Socket.io connection error:', error);
+      });
 
       socket.on('employeeCheckIn', (evt) => {
         console.log('📥 Received check-in event:', evt);
@@ -171,7 +302,7 @@ const AdminDashboard = () => {
         socket.disconnect();
       }
     };
-  }, []);
+  }, [checkForEmployeeCheckIns]);
 
   
 
@@ -212,18 +343,22 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     // Set up real-time polling once on component mount
-    console.log('Setting up real-time polling system...');
+    console.log('🔄 Setting up real-time polling system...');
     
-    // Check for updates every 5 seconds for more responsive updates
+    // Initial fetch immediately
+    checkForEmployeeCheckIns();
+    
+    // Check for updates every 3 seconds for more responsive updates
     const realTimeInterval = setInterval(() => {
+      console.log('⏰ Polling interval triggered - fetching attendance data...');
       checkForEmployeeCheckIns();
-    }, 5000);
+    }, 3000);
     
     return () => {
-      console.log('Cleaning up real-time polling system');
+      console.log('🧹 Cleaning up real-time polling system');
       clearInterval(realTimeInterval);
     };
-  }, []); // No dependencies to prevent re-running
+  }, [checkForEmployeeCheckIns]); // Include checkForEmployeeCheckIns in dependencies
 
   useEffect(() => {
     if (realEmployees.length > 0) {
@@ -695,126 +830,11 @@ const AdminDashboard = () => {
     }
   };
 
-  // Function to update employee status from database records
-  const updateEmployeeStatusFromDatabase = (attendanceRecords) => {
-    setRealEmployees(prevEmployees => {
-      // Create a map of employeeId to attendance record for quick lookup
-      const attendanceMap = new Map();
-      attendanceRecords.forEach(record => {
-        attendanceMap.set(record.employeeId, record);
-      });
-      
-      // Update each employee based on database records
-      const updatedEmployees = prevEmployees.map(emp => {
-        const attendanceRecord = attendanceMap.get(String(emp.id));
-        
-        if (attendanceRecord) {
-          // Employee has checked in today
-          const checkInTime = new Date(attendanceRecord.checkInTime);
-          const checkInFormatted = format(checkInTime, 'HH:mm');
-          
-          if (attendanceRecord.checkOutTime) {
-            // Employee has checked out
-            return {
-              ...emp,
-              status: 'completed',
-              checkIn: checkInFormatted,
-              location: attendanceRecord.location || 'Office',
-              hours: attendanceRecord.hoursWorked
-            };
-          } else {
-            // Employee is currently checked in
-            return {
-              ...emp,
-              status: 'active',
-              checkIn: checkInFormatted,
-              location: attendanceRecord.location || 'Office',
-              hours: '0:00'
-            };
-          }
-        } else {
-          // Employee hasn't checked in today - mark as absent if they were previously active
-          return {
-            ...emp,
-            status: emp.status === 'active' ? 'absent' : emp.status,
-            checkIn: emp.status === 'active' ? '-' : (emp.checkIn || '-'),
-            hours: emp.status === 'active' ? '0:00' : (emp.hours || '0:00')
-          };
-        }
-      });
-      
-      // Update employee status state
-      setEmployeeStatus(updatedEmployees);
-      
-      // Calculate updated stats
-      const activeCount = updatedEmployees.filter(emp => emp.status === 'active' || emp.status === 'completed').length;
-      const leaveCount = updatedEmployees.filter(emp => emp.status === 'leave').length;
-      const absentCount = updatedEmployees.filter(emp => emp.status === 'absent').length;
-      
-      setStats(prev => ({
-        ...prev,
-        totalEmployees: updatedEmployees.length,
-        activeToday: activeCount,
-        onLeave: leaveCount,
-        absentToday: absentCount,
-        attendanceRate: updatedEmployees.length > 0 ? ((activeCount / updatedEmployees.length) * 100).toFixed(1) : '0'
-      }));
-      
-      return updatedEmployees;
-    });
-  };
-
-  // Real-time check for employee check-ins (optimized to prevent spam)
-  const checkForEmployeeCheckIns = async () => {
-    try {
-      // Fetch today's attendance records from database
-      const response = await fetch('/api/attendance-records/today/all');
-      const data = await response.json();
-      
-      if (response.ok && data.success && Array.isArray(data.records)) {
-        console.log('📊 Fetched', data.records.length, 'attendance records from database');
-        
-        // Update employee status based on database records
-        updateEmployeeStatusFromDatabase(data.records);
-        
-        // Update recent activity with new check-ins/check-outs
-        const newActivities = data.records
-          .filter(record => {
-            // Only show records from the last hour to avoid cluttering
-            const recordTime = new Date(record.checkInTime);
-            return Date.now() - recordTime.getTime() < 3600000; // 1 hour
-          })
-          .map(record => ({
-            id: `${record.employeeId}_${record.checkInTime}`,
-            type: record.checkOutTime ? 'check-out' : 'check-in',
-            employee: record.employeeName,
-            department: record.department,
-            time: new Date(record.checkOutTime || record.checkInTime),
-            status: 'success',
-            avatar: record.employeeName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-          }));
-        
-        if (newActivities.length > 0) {
-          setRecentActivity(prev => {
-            // Merge with existing activities, avoiding duplicates
-            const existingIds = new Set(prev.map(a => a.id));
-            const uniqueNew = newActivities.filter(a => !existingIds.has(a.id));
-            return [...uniqueNew, ...prev].slice(0, 15);
-          });
-        }
-      } else {
-        console.error('Failed to fetch attendance records:', data.error);
-      }
-    } catch (error) {
-      console.error('Error fetching attendance records:', error);
-    }
-  };
-  
   // Separate function to update stats and employee status without full reload (kept for backward compatibility)
-  const updateEmployeeStats = () => {
+  const updateEmployeeStats = useCallback(() => {
     // This function now just triggers a database fetch
     checkForEmployeeCheckIns();
-  };
+  }, [checkForEmployeeCheckIns]);
 
 
 

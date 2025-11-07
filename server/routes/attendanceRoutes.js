@@ -192,13 +192,17 @@ router.post("/checkin", async (req, res) => {
     // Emit socket event for real-time update with canonical ObjectId
     const io = req.app.get('io');
     if (io) {
-      io.emit('employeeCheckIn', {
+      const socketData = {
         employeeId: String(employee._id),
         employeeName: attendanceRecord.employeeId?.name || 'Unknown',
         department: attendanceRecord.employeeId?.department || 'Unknown',
         checkInTime: attendanceRecord.inTime,
         location: location || 'Office'
-      });
+      };
+      console.log('📡 Broadcasting check-in event to all clients:', socketData);
+      io.emit('employeeCheckIn', socketData);
+    } else {
+      console.warn('⚠️ Socket.io not available - cannot broadcast check-in event');
     }
     
     res.status(201).json({
@@ -289,13 +293,17 @@ router.post("/checkout", async (req, res) => {
     // Emit socket event for real-time update with canonical ObjectId
     const io = req.app.get('io');
     if (io) {
-      io.emit('employeeCheckOut', {
+      const socketData = {
         employeeId: String(employee._id),
         employeeName: attendanceRecord.employeeId?.name || 'Unknown',
         department: attendanceRecord.employeeId?.department || 'Unknown',
         checkOutTime: attendanceRecord.outTime,
         hoursWorked: hoursWorked
-      });
+      };
+      console.log('📡 Broadcasting check-out event to all clients:', socketData);
+      io.emit('employeeCheckOut', socketData);
+    } else {
+      console.warn('⚠️ Socket.io not available - cannot broadcast check-out event');
     }
     
     res.json({
