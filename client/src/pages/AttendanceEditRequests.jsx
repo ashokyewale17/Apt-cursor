@@ -20,110 +20,132 @@ const AttendanceEditRequests = () => {
   const loadEditRequests = async () => {
     setLoading(true);
     try {
-      // In a real implementation, this would fetch from the backend
-      // For now, we'll use mock data
-      const mockRequests = [
-        {
-          id: 1,
-          employeeId: 2,
-          employeeName: 'Vijay Solanki',
-          employeeEmail: 'vijay.solanki@company.com',
-          attendanceId: 101,
-          date: new Date(2025, 9, 5),
-          originalInTime: '09:00',
-          originalOutTime: '17:30',
-          requestedInTime: '08:45',
-          requestedOutTime: '17:45',
-          reason: 'Actually arrived early and stayed late to finish project',
-          status: 'pending',
-          requestedAt: new Date(2025, 9, 6, 10, 30)
-        },
-        {
-          id: 2,
-          employeeId: 4,
-          employeeName: 'Sanket Pawal',
-          employeeEmail: 'sanket.pawal@company.com',
-          attendanceId: 102,
-          date: new Date(2025, 9, 4),
-          originalInTime: '09:15',
-          originalOutTime: '17:45',
-          requestedInTime: '09:00',
-          requestedOutTime: '18:00',
-          reason: 'Team meeting started early, had to adjust timing',
-          status: 'pending',
-          requestedAt: new Date(2025, 9, 5, 14, 20)
-        },
-        {
-          id: 3,
-          employeeId: 5,
-          employeeName: 'Ashok Yewale',
-          employeeEmail: 'ashok.yewale@company.com',
-          attendanceId: 103,
-          date: new Date(2025, 9, 3),
-          originalInTime: '08:15',
-          originalOutTime: '16:30',
-          requestedInTime: '08:15',
-          requestedOutTime: '17:00',
-          reason: 'Worked extra hour to complete client deliverables',
-          status: 'approved',
-          requestedAt: new Date(2025, 9, 4, 9, 15),
-          reviewedAt: new Date(2025, 9, 4, 11, 30),
-          reviewedBy: 'Tushar Mhaskar'
-        },
-        {
-          id: 4,
-          employeeId: 7,
-          employeeName: 'Prasanna Pandit',
-          employeeEmail: 'prasanna.pandit@company.com',
-          attendanceId: 104,
-          date: new Date(2025, 9, 2),
-          originalInTime: '10:30',
-          originalOutTime: '18:30',
-          requestedInTime: '09:00',
-          requestedOutTime: '18:30',
-          reason: 'Misrecorded arrival time, actually came in earlier',
-          status: 'rejected',
-          requestedAt: new Date(2025, 9, 3, 16, 45),
-          reviewedAt: new Date(2025, 9, 3, 18, 20),
-          reviewedBy: 'Tushar Mhaskar',
-          rejectionReason: 'Insufficient evidence provided'
+      const token = localStorage.getItem('token');
+      const statusParam = filter === 'all' ? '' : `?status=${filter}`;
+      
+      const response = await fetch(`/api/attendance-edit/edit-requests${statusParam}`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : undefined
         }
-      ];
-
-      // Filter based on status
-      const filteredRequests = filter === 'all' 
-        ? mockRequests 
-        : mockRequests.filter(req => req.status === filter);
-
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch edit requests');
+      }
+      
+      const data = await response.json();
+      
+      // Process and format the data to match UI expectations
+      const formattedRequests = data.map(request => {
+        const employee = request.employeeId;
+        const attendance = request.attendanceId;
+        const reviewedBy = request.reviewedBy;
+        
+        // Format times from Date objects or strings
+        const formatTime = (time) => {
+          if (!time) return '-';
+          if (typeof time === 'string') {
+            // If it's already a time string like "09:00", return it
+            if (time.match(/^\d{2}:\d{2}$/)) return time;
+            // If it's an ISO string, extract time
+            const date = new Date(time);
+            return format(date, 'HH:mm');
+          }
+          if (time instanceof Date) {
+            return format(time, 'HH:mm');
+          }
+          return '-';
+        };
+        
+        return {
+          id: request._id,
+          employeeId: employee?._id || employee?.id || request.employeeId,
+          employeeName: employee?.name || 'Unknown Employee',
+          employeeEmail: employee?.email || '',
+          attendanceId: attendance?._id || attendance?.id || request.attendanceId,
+          date: new Date(request.date),
+          originalInTime: formatTime(request.originalInTime || attendance?.inTime),
+          originalOutTime: formatTime(request.originalOutTime || attendance?.outTime),
+          requestedInTime: formatTime(request.requestedInTime),
+          requestedOutTime: formatTime(request.requestedOutTime),
+          reason: request.reason || '',
+          status: request.status || 'pending',
+          requestedAt: new Date(request.requestedAt || request.createdAt),
+          reviewedAt: request.reviewedAt ? new Date(request.reviewedAt) : null,
+          reviewedBy: reviewedBy?.name || (request.reviewedBy ? 'Admin' : null),
+          rejectionReason: request.comment || request.rejectionReason || null
+        };
+      });
+      
       // Filter based on search term
-      const searchedRequests = filteredRequests.filter(req => 
+      const searchedRequests = formattedRequests.filter(req => 
         req.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         req.employeeEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
         req.reason.toLowerCase().includes(searchTerm.toLowerCase())
       );
 
       setRequests(searchedRequests);
+      console.log('✅ Loaded', searchedRequests.length, 'edit requests from database');
     } catch (error) {
       console.error('Error loading edit requests:', error);
+      setRequests([]);
     } finally {
       setLoading(false);
     }
   };
 
   const handleApprove = async (requestId) => {
-    // In a real implementation, this would send a request to the backend
-    console.log(`Approving request ${requestId}`);
-    alert(`Request ${requestId} approved successfully!`);
-    loadEditRequests(); // Refresh the list
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/attendance-edit/edit-request/${requestId}/approve`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : undefined
+        },
+        body: JSON.stringify({})
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert('Request approved successfully!');
+        loadEditRequests(); // Refresh the list
+      } else {
+        alert(data.message || 'Failed to approve request');
+      }
+    } catch (error) {
+      console.error('Error approving request:', error);
+      alert('Failed to approve request. Please try again.');
+    }
   };
 
   const handleReject = async (requestId) => {
     const reason = prompt('Please provide a reason for rejection:');
     if (reason) {
-      // In a real implementation, this would send a request to the backend
-      console.log(`Rejecting request ${requestId} with reason: ${reason}`);
-      alert(`Request ${requestId} rejected successfully!`);
-      loadEditRequests(); // Refresh the list
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/attendance-edit/edit-request/${requestId}/reject`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : undefined
+          },
+          body: JSON.stringify({ comment: reason })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          alert('Request rejected successfully!');
+          loadEditRequests(); // Refresh the list
+        } else {
+          alert(data.message || 'Failed to reject request');
+        }
+      } catch (error) {
+        console.error('Error rejecting request:', error);
+        alert('Failed to reject request. Please try again.');
+      }
     }
   };
 

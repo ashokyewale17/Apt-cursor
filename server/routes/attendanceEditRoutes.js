@@ -104,6 +104,32 @@ router.get("/edit-requests/pending", authenticateToken, async (req, res) => {
   }
 });
 
+// Get all edit requests (for admin) - with optional status filter
+router.get("/edit-requests", authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    const employee = await Employee.findById(req.user.id);
+    if (employee.role !== "admin") {
+      return res.status(403).json({ 
+        message: "Access denied. Admin only." 
+      });
+    }
+
+    const { status } = req.query;
+    const query = status && status !== 'all' ? { status } : {};
+    
+    const requests = await AttendanceEditRequest.find(query)
+      .sort({ createdAt: -1 })
+      .populate("employeeId", "name email")
+      .populate("attendanceId", "inTime outTime date")
+      .populate("reviewedBy", "name");
+
+    res.json(requests);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
 // Approve or reject an edit request (admin only)
 router.put("/edit-request/:id/:action", authenticateToken, async (req, res) => {
   try {
