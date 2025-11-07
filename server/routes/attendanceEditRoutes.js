@@ -171,30 +171,32 @@ router.put("/edit-request/:id/:action", authenticateToken, async (req, res) => {
     if (action === "approve") {
       const attendance = editRequest.attendanceId;
       
-      // Use the edit request date (which is the date the employee selected)
-      // This ensures we're using the exact date the employee intended
-      const editRequestDate = new Date(editRequest.date);
+      // The key issue: We need to create the date in the exact same way as the original check-in
+      // The original check-in uses the attendance.date which is stored at midnight (00:00:00)
+      // We need to use that same date and just change the time portion
       
-      // Extract date components - use the edit request date to ensure consistency
-      // Convert to local date string first to avoid timezone issues
-      const dateStr = editRequestDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
-      const [dateYear, dateMonth, dateDay] = dateStr.split('-').map(Number);
+      // Get the attendance date - this is the date stored in the database
+      // It's stored as a Date object at midnight (00:00:00) in local timezone
+      const baseDate = new Date(attendance.date);
       
       // Convert time strings to Date objects
       if (editRequest.requestedInTime) {
         // Parse time string (HH:mm format)
         const [hours, minutes] = editRequest.requestedInTime.split(':').map(Number);
-        // Create a date in local timezone using the edit request date
-        // This ensures the time is set on the correct date
-        const inTimeDate = new Date(dateYear, dateMonth - 1, dateDay, hours || 0, minutes || 0, 0, 0);
+        
+        // Create date by combining the base date with the requested time
+        // We create a new Date object with the same date but different time
+        // This matches exactly how the original check-in stores times
+        const inTimeDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), hours || 0, minutes || 0, 0, 0);
         attendance.inTime = inTimeDate;
       }
       
       if (editRequest.requestedOutTime) {
         // Parse time string (HH:mm format)
         const [hours, minutes] = editRequest.requestedOutTime.split(':').map(Number);
-        // Create a date in local timezone using the edit request date
-        const outTimeDate = new Date(dateYear, dateMonth - 1, dateDay, hours || 0, minutes || 0, 0, 0);
+        
+        // Create date by combining the base date with the requested time
+        const outTimeDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), hours || 0, minutes || 0, 0, 0);
         attendance.outTime = outTimeDate;
       }
       
@@ -205,7 +207,7 @@ router.put("/edit-request/:id/:action", authenticateToken, async (req, res) => {
       
       await attendance.save();
       
-      // Format times for logging (using local time to see what will be displayed)
+      // Format times for logging
       const formatTimeForLog = (date) => {
         if (!date) return null;
         const d = new Date(date);
@@ -215,11 +217,14 @@ router.put("/edit-request/:id/:action", authenticateToken, async (req, res) => {
       };
       
       console.log(`✅ Updated attendance record ${attendance._id} with new times:`, {
-        editRequestDate: dateStr,
+        baseDate: baseDate.toISOString(),
+        baseDateLocal: `${baseDate.getFullYear()}-${String(baseDate.getMonth() + 1).padStart(2, '0')}-${String(baseDate.getDate()).padStart(2, '0')}`,
         requestedInTime: editRequest.requestedInTime,
         requestedOutTime: editRequest.requestedOutTime,
         storedInTime: formatTimeForLog(attendance.inTime),
         storedOutTime: formatTimeForLog(attendance.outTime),
+        storedInTimeGetHours: attendance.inTime ? attendance.inTime.getHours() : null,
+        storedInTimeGetMinutes: attendance.inTime ? attendance.inTime.getMinutes() : null,
         inTimeISO: attendance.inTime ? attendance.inTime.toISOString() : null,
         outTimeISO: attendance.outTime ? attendance.outTime.toISOString() : null
       });
