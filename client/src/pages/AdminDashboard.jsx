@@ -460,6 +460,14 @@ const AdminDashboard = () => {
     }
   }, [realEmployees, selectedMonth, selectedYear]);
 
+  // Reload attendance data when modal opens
+  useEffect(() => {
+    if (showAttendanceModal && realEmployees.length > 0) {
+      console.log('📅 Attendance modal opened - reloading data');
+      loadMonthlyAttendance(realEmployees);
+    }
+  }, [showAttendanceModal, realEmployees.length]);
+
   const generateAnalyticsData = () => {
     const currentDate = new Date();
     const last7Days = Array.from({ length: 7 }, (_, i) => {
@@ -768,29 +776,57 @@ const AdminDashboard = () => {
 
   // Load real monthly attendance data from API
   const loadMonthlyAttendance = async (employees) => {
+    if (!employees || employees.length === 0) {
+      console.warn('⚠️ No employees to load attendance for');
+      return;
+    }
+
     try {
       console.log('📅 Loading monthly attendance data for', selectedMonth + 1, selectedYear);
+      console.log('📅 Employees count:', employees.length);
       
       // Note: selectedMonth is 0-indexed (0-11), API expects 1-12
       const monthParam = selectedMonth + 1;
-      const response = await fetch(`/api/attendance-records/month/${monthParam}/${selectedYear}`);
+      const url = `/api/attendance-records/month/${monthParam}/${selectedYear}`;
+      console.log('📅 Fetching from:', url);
+      
+      const response = await fetch(url);
       const data = await response.json();
+      
+      console.log('📅 API Response:', {
+        ok: response.ok,
+        success: data.success,
+        recordsCount: data.records ? data.records.length : 0,
+        error: data.error
+      });
       
       if (response.ok && data.success && Array.isArray(data.records)) {
         console.log('✅ Fetched', data.records.length, 'employee attendance records');
+        console.log('📅 Sample record:', data.records[0]);
         
         const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
         
         // Create a map of employee attendance data from API
         const apiDataMap = new Map();
         data.records.forEach(empData => {
-          apiDataMap.set(empData.employeeId, empData);
+          // Normalize employee ID to string for comparison
+          const normalizedId = String(empData.employeeId);
+          apiDataMap.set(normalizedId, empData);
+          console.log('📅 Mapped employee:', normalizedId, '->', empData.employeeName);
         });
+        
+        console.log('📅 API Data Map keys:', Array.from(apiDataMap.keys()));
+        console.log('📅 Employee IDs:', employees.map(e => String(e.id)));
         
         // Process each employee
         const monthlyData = employees.map(employee => {
           const empId = String(employee.id);
           const apiData = apiDataMap.get(empId);
+          
+          console.log(`📅 Processing employee ${employee.name} (ID: ${empId})`, {
+            hasApiData: !!apiData,
+            recordCount: apiData ? apiData.records.length : 0
+          });
           
           // Initialize arrays for all days in month
           const attendanceRecords = [];
@@ -881,15 +917,79 @@ const AdminDashboard = () => {
         
         setMonthlyAttendance(monthlyData);
         console.log('✅ Monthly attendance data loaded successfully');
+        console.log('📅 Monthly data summary:', monthlyData.map(emp => ({
+          name: emp.employee.name,
+          presentDays: emp.summary.presentDays,
+          recordsCount: emp.attendanceRecords.length
+        })));
       } else {
-        console.error('Failed to fetch monthly attendance:', data.error || 'Unknown error');
-        // Fallback to empty data
-        setMonthlyAttendance([]);
+        console.error('❌ Failed to fetch monthly attendance:', data.error || 'Unknown error');
+        console.error('❌ Response status:', response.status);
+        console.error('❌ Response data:', data);
+        // Fallback to empty data structure with all employees
+        const emptyData = employees.map(employee => {
+          const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+          const attendanceRecords = [];
+          
+          for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(selectedYear, selectedMonth, day);
+            const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+            attendanceRecords.push({
+              date: day,
+              status: isWeekend ? 'weekend' : 'absent',
+              inTime: '',
+              outTime: '',
+              hoursWorked: '0'
+            });
+          }
+          
+          return {
+            employee,
+            attendanceRecords,
+            summary: {
+              presentDays: 0,
+              leaveDays: 0,
+              totalHours: '0.0',
+              avgHours: '0.0',
+              attendanceRate: '0.0'
+            }
+          };
+        });
+        setMonthlyAttendance(emptyData);
       }
     } catch (error) {
-      console.error('Error loading monthly attendance:', error);
-      // Fallback to empty data
-      setMonthlyAttendance([]);
+      console.error('❌ Error loading monthly attendance:', error);
+      console.error('❌ Error stack:', error.stack);
+      // Fallback to empty data structure
+      const emptyData = employees.map(employee => {
+        const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+        const attendanceRecords = [];
+        
+        for (let day = 1; day <= daysInMonth; day++) {
+          const date = new Date(selectedYear, selectedMonth, day);
+          const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+          attendanceRecords.push({
+            date: day,
+            status: isWeekend ? 'weekend' : 'absent',
+            inTime: '',
+            outTime: '',
+            hoursWorked: '0'
+          });
+        }
+        
+        return {
+          employee,
+          attendanceRecords,
+          summary: {
+            presentDays: 0,
+            leaveDays: 0,
+            totalHours: '0.0',
+            avgHours: '0.0',
+            attendanceRate: '0.0'
+          }
+        };
+      });
+      setMonthlyAttendance(emptyData);
     }
   };
 
