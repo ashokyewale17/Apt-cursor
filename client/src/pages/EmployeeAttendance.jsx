@@ -24,96 +24,185 @@ const EmployeeAttendance = () => {
     loadPendingRequests();
   }, [currentMonth]);
 
-  const loadAttendanceData = () => {
+  const loadAttendanceData = async () => {
+    if (!user || (!user.id && !user._id)) {
+      console.error('User not found');
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     
-    // Generate mock attendance data for the current month
-    const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(currentMonth);
-    const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
-    
-    const mockData = monthDays.map(day => {
-      const dayKey = format(day, 'yyyy-MM-dd');
-      const storageKey = `checkIn_${user.id}_${dayKey}`;
-      const savedData = localStorage.getItem(storageKey);
+    try {
+      // Get month and year for API call
+      const month = currentMonth.getMonth() + 1; // API expects 1-12
+      const year = currentMonth.getFullYear();
+      const employeeId = user.id || user._id;
       
-      // Skip weekends for mock data
-      if (isWeekend(day)) {
+      // Fetch attendance records from database
+      const response = await fetch(`/api/attendance-records/employee/${employeeId}/${month}/${year}`);
+      const records = response.ok ? await response.json() : [];
+      
+      // Generate all days in the month
+      const monthStart = startOfMonth(currentMonth);
+      const monthEnd = endOfMonth(currentMonth);
+      const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+      
+      // Create a map of date -> attendance record for quick lookup
+      const recordsMap = new Map();
+      records.forEach(record => {
+        const recordDate = new Date(record.date);
+        const day = recordDate.getDate();
+        recordsMap.set(day, record);
+      });
+      
+      // Process each day of the month
+      const attendanceData = monthDays.map(day => {
+        const isWeekendDay = isWeekend(day);
+        const dayOfMonth = day.getDate();
+        const record = recordsMap.get(dayOfMonth);
+        const isToday = isSameDay(day, new Date());
+        const isPast = day < new Date();
+        
+        // Handle weekends
+        if (isWeekendDay) {
+          return {
+            date: day,
+            status: 'weekend',
+            checkIn: null,
+            checkOut: null,
+            totalHours: '0h 0m',
+            breaks: 0,
+            notes: 'Weekend'
+          };
+        }
+        
+        // Handle days with attendance records
+        if (record) {
+          const dbStatus = record.status || 'Present';
+          let status = 'absent';
+          let checkIn = null;
+          let checkOut = null;
+          let totalHours = '0h 0m';
+          let notes = '';
+          
+          if (dbStatus === 'Leave' || dbStatus === 'Holiday') {
+            status = 'absent';
+            notes = dbStatus === 'Leave' ? 'On Leave' : 'Holiday';
+          } else if (dbStatus === 'Absent') {
+            status = 'absent';
+            notes = 'Absent';
+          } else if (record.inTime) {
+            // Has check-in time
+            checkIn = new Date(record.inTime);
+            
+            // Determine if late (check-in after 9:30 AM)
+            const lateThreshold = new Date(checkIn);
+            lateThreshold.setHours(9, 30, 0, 0);
+            const isLate = checkIn > lateThreshold;
+            
+            if (record.outTime) {
+              // Has check-out time - completed day
+              checkOut = new Date(record.outTime);
+              
+              // Calculate hours worked
+              const diffMs = checkOut - checkIn;
+              const hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
+              const hours = Math.floor(hoursWorked);
+              const minutes = Math.round((hoursWorked - hours) * 60);
+              totalHours = `${hours}h ${minutes}m`;
+              
+              status = 'completed';
+              if (isLate) {
+                notes = 'Late arrival';
+              }
+            } else {
+              // Checked in but not checked out yet - active day
+              status = isToday ? 'active' : 'completed';
+              if (isLate) {
+                notes = 'Late arrival';
+              }
+            }
+          } else {
+            // Present status but no inTime
+            status = 'absent';
+            notes = 'No check-in recorded';
+          }
+          
+          return {
+            date: day,
+            status,
+            checkIn,
+            checkOut,
+            totalHours,
+            breaks: 0, // Breaks not stored in database currently
+            notes
+          };
+        }
+        
+        // Handle days without records
+        if (isToday) {
+          // Today - might be active if checked in
+          // Check localStorage for today's check-in
+          const dayKey = format(day, 'yyyy-MM-dd');
+          const employeeId = user.id || user._id;
+          const storageKey = `checkIn_${employeeId}_${dayKey}`;
+          const savedData = localStorage.getItem(storageKey);
+          
+          if (savedData) {
+            const data = JSON.parse(savedData);
+            if (data.checkedIn && !data.checkOutTime) {
+              return {
+                date: day,
+                status: 'active',
+                checkIn: data.checkInTime ? new Date(data.checkInTime) : null,
+                checkOut: null,
+                totalHours: '0h 0m',
+                breaks: data.activities ? data.activities.filter(a => a.type === 'break').length : 0,
+                notes: ''
+              };
+            }
+          }
+        }
+        
+        // Past days without records are absent
+        if (isPast) {
+          return {
+            date: day,
+            status: 'absent',
+            checkIn: null,
+            checkOut: null,
+            totalHours: '0h 0m',
+            breaks: 0,
+            notes: 'Absent'
+          };
+        }
+        
+        // Future days
         return {
           date: day,
-          status: 'weekend',
+          status: 'absent',
           checkIn: null,
           checkOut: null,
-          totalHours: 0,
+          totalHours: '0h 0m',
           breaks: 0,
-          notes: 'Weekend'
+          notes: ''
         };
-      }
+      });
       
-      if (savedData) {
-        const data = JSON.parse(savedData);
-        return {
-          date: day,
-          status: data.checkedIn ? 'active' : (data.totalTime ? 'completed' : 'absent'),
-          checkIn: data.checkInTime ? new Date(data.checkInTime) : null,
-          checkOut: data.checkOutTime ? new Date(data.checkOutTime) : null,
-          totalHours: data.totalTime || '0h 0m',
-          breaks: data.activities ? data.activities.filter(a => a.type === 'break').length : 0,
-          notes: data.notes || ''
-        };
-      }
-      
-      // Generate some mock data for demonstration
-      const isToday = isSameDay(day, new Date());
-      const isPast = day < new Date();
-      
-      if (isToday) {
-        return {
-          date: day,
-          status: 'active',
-          checkIn: new Date(Date.now() - 8 * 60 * 60 * 1000), // 8 hours ago
-          checkOut: null,
-          totalHours: '8h 0m',
-          breaks: 1,
-          notes: 'Currently working'
-        };
-      } else if (isPast && Math.random() > 0.2) {
-        const checkInHour = Math.floor(Math.random() * 3) + 8; // 8-10 AM
-        const checkOutHour = Math.floor(Math.random() * 3) + 17; // 5-7 PM
-        const checkIn = new Date(day);
-        checkIn.setHours(checkInHour, Math.floor(Math.random() * 60), 0);
-        const checkOut = new Date(day);
-        checkOut.setHours(checkOutHour, Math.floor(Math.random() * 60), 0);
-        
-        const totalMinutes = (checkOut - checkIn) / (1000 * 60);
-        const hours = Math.floor(totalMinutes / 60);
-        const minutes = Math.floor(totalMinutes % 60);
-        
-        return {
-          date: day,
-          status: 'completed',
-          checkIn,
-          checkOut,
-          totalHours: `${hours}h ${minutes}m`,
-          breaks: Math.floor(Math.random() * 3),
-          notes: Math.random() > 0.8 ? 'Late arrival' : ''
-        };
-      }
-      
-      return {
-        date: day,
-        status: 'absent',
-        checkIn: null,
-        checkOut: null,
-        totalHours: '0h 0m',
-        breaks: 0,
-        notes: Math.random() > 0.7 ? 'Sick leave' : 'Absent'
-      };
-    });
-    
-    setAttendanceData(mockData);
-    calculateMonthlyStats(mockData);
-    setLoading(false);
+      setAttendanceData(attendanceData);
+      calculateMonthlyStats(attendanceData);
+      console.log('✅ Loaded attendance data from database for', month, year);
+    } catch (error) {
+      console.error('Error loading attendance data:', error);
+      addNotification({
+        title: 'Error Loading Attendance',
+        message: 'Failed to load attendance data. Please try again.',
+        type: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadPendingRequests = async () => {
@@ -132,18 +221,28 @@ const EmployeeAttendance = () => {
 
   const calculateMonthlyStats = (data) => {
     const totalDays = data.length;
-    const workingDays = data.filter(d => !isWeekend(d.date)).length;
-    const presentDays = data.filter(d => d.status === 'completed' || d.status === 'active').length;
-    const absentDays = data.filter(d => d.status === 'absent').length;
+    const workingDays = data.filter(d => !isWeekend(d.date) && d.date <= new Date()).length;
+    const presentDays = data.filter(d => (d.status === 'completed' || d.status === 'active') && !isWeekend(d.date)).length;
+    const absentDays = data.filter(d => d.status === 'absent' && !isWeekend(d.date) && d.date <= new Date()).length;
     const lateDays = data.filter(d => d.notes === 'Late arrival').length;
     
-    const totalHours = data.reduce((total, day) => {
-      if (day.totalHours && day.totalHours !== '0h 0m') {
-        const [hours, minutes] = day.totalHours.split('h ');
-        return total + parseInt(hours) + (parseInt(minutes) / 60);
+    // Calculate total hours from all completed days
+    let totalHoursDecimal = 0;
+    data.forEach(day => {
+      if (day.totalHours && day.totalHours !== '0h 0m' && day.status === 'completed') {
+        const hoursStr = day.totalHours;
+        const hoursMatch = hoursStr.match(/(\d+)h\s*(\d+)m?/);
+        if (hoursMatch) {
+          const hours = parseInt(hoursMatch[1]) || 0;
+          const minutes = parseInt(hoursMatch[2]) || 0;
+          totalHoursDecimal += hours + (minutes / 60);
+        }
       }
-      return total;
-    }, 0);
+    });
+    
+    const totalHours = Math.round(totalHoursDecimal * 100) / 100;
+    const hours = Math.floor(totalHours);
+    const minutes = Math.round((totalHours - hours) * 60);
     
     setMonthlyStats({
       totalDays,
@@ -151,7 +250,7 @@ const EmployeeAttendance = () => {
       presentDays,
       absentDays,
       lateDays,
-      totalHours: `${Math.floor(totalHours)}h ${Math.round((totalHours % 1) * 60)}m`,
+      totalHours: `${hours}h ${minutes}m`,
       attendanceRate: workingDays > 0 ? Math.round((presentDays / workingDays) * 100) : 0
     });
   };
