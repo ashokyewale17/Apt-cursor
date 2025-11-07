@@ -81,18 +81,33 @@ const AdminDashboard = () => {
 
   // Function to update employee status from database records
   const updateEmployeeStatusFromDatabase = useCallback((attendanceRecords) => {
+    console.log('🔄 Updating employee status from database records:', {
+      recordCount: attendanceRecords.length,
+      records: attendanceRecords.map(r => ({ employeeId: r.employeeId, name: r.employeeName }))
+    });
+    
     setRealEmployees(prevEmployees => {
+      console.log('📋 Current employees:', prevEmployees.map(e => ({ id: e.id, name: e.name })));
+      
       // Create a map of employeeId to attendance record for quick lookup
+      // Normalize IDs to strings for comparison
       const attendanceMap = new Map();
       attendanceRecords.forEach(record => {
-        attendanceMap.set(record.employeeId, record);
+        // Store with normalized string ID as key
+        const normalizedId = String(record.employeeId).trim();
+        attendanceMap.set(normalizedId, record);
       });
+      
+      console.log('🗺️ Attendance map keys:', Array.from(attendanceMap.keys()));
       
       // Update each employee based on database records
       const updatedEmployees = prevEmployees.map(emp => {
-        const attendanceRecord = attendanceMap.get(String(emp.id));
+        // Normalize employee ID for comparison
+        const empId = String(emp.id).trim();
+        const attendanceRecord = attendanceMap.get(empId);
         
         if (attendanceRecord) {
+          console.log(`✅ Found attendance for ${emp.name} (${empId})`);
           // Employee has checked in today
           const checkInTime = new Date(attendanceRecord.checkInTime);
           const checkInFormatted = format(checkInTime, 'HH:mm');
@@ -117,15 +132,24 @@ const AdminDashboard = () => {
             };
           }
         } else {
-          // Employee hasn't checked in today - mark as absent if they were previously active
+          // Employee hasn't checked in today
+          // Only mark as absent if they were previously checked in today
+          // Otherwise keep their default status
+          const wasActiveToday = emp.status === 'active' && emp.checkIn && emp.checkIn !== '-';
           return {
             ...emp,
-            status: emp.status === 'active' ? 'absent' : emp.status,
-            checkIn: emp.status === 'active' ? '-' : (emp.checkIn || '-'),
-            hours: emp.status === 'active' ? '0:00' : (emp.hours || '0:00')
+            status: wasActiveToday ? 'absent' : (emp.status === 'inactive' ? 'inactive' : 'absent'),
+            checkIn: wasActiveToday ? '-' : (emp.checkIn || '-'),
+            hours: wasActiveToday ? '0:00' : (emp.hours || '0:00')
           };
         }
       });
+      
+      console.log('✅ Updated employees:', updatedEmployees.map(e => ({ 
+        name: e.name, 
+        status: e.status, 
+        checkIn: e.checkIn 
+      })));
       
       // Update employee status state
       setEmployeeStatus(updatedEmployees);
@@ -154,10 +178,26 @@ const AdminDashboard = () => {
       console.log('🔄 Polling for attendance updates...');
       // Fetch today's attendance records from database
       const response = await fetch('/api/attendance-records/today/all');
-      const data = await response.json();
       
-      if (response.ok && data.success && Array.isArray(data.records)) {
+      if (!response.ok) {
+        console.error('❌ API response not OK:', response.status, response.statusText);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('📦 API Response:', data);
+      
+      if (data.success && Array.isArray(data.records)) {
         console.log('📊 Fetched', data.records.length, 'attendance records from database');
+        
+        if (data.records.length > 0) {
+          console.log('📋 Attendance records:', data.records.map(r => ({
+            employeeId: r.employeeId,
+            name: r.employeeName,
+            checkIn: r.checkInTime,
+            checkOut: r.checkOutTime
+          })));
+        }
         
         // Update employee status based on database records
         updateEmployeeStatusFromDatabase(data.records);
@@ -188,18 +228,18 @@ const AdminDashboard = () => {
           });
         }
       } else {
-        console.error('Failed to fetch attendance records:', data.error);
+        console.error('❌ Failed to fetch attendance records:', data.error || 'Invalid response format');
       }
     } catch (error) {
-      console.error('Error fetching attendance records:', error);
+      console.error('❌ Error fetching attendance records:', error);
     }
   }, [updateEmployeeStatusFromDatabase]);
 
   useEffect(() => {
-    loadDashboardData();
-    // Load real employees from API
+    // Load real employees from API first (don't load from localStorage)
     const fetchEmployees = async () => {
       try {
+        console.log('👥 Fetching employees from API...');
         const token = localStorage.getItem('token');
         const resp = await fetch('/api/employees?page=1&limit=100', {
           headers: {
@@ -208,6 +248,7 @@ const AdminDashboard = () => {
         });
         const data = await resp.json();
         if (resp.ok && Array.isArray(data.employees)) {
+          console.log('✅ Loaded', data.employees.length, 'employees from API');
           // Normalize to match existing UI shape minimally
           const normalized = data.employees.map(e => ({
             id: e._id,
@@ -215,23 +256,35 @@ const AdminDashboard = () => {
             email: e.email,
             department: e.department,
             role: e.position,
-            status: e.isActive ? 'active' : 'inactive',
-            phone: e.phone
+            status: 'absent', // Default to absent, will be updated by attendance data
+            phone: e.phone,
+            checkIn: '-',
+            hours: '0:00',
+            location: 'Office'
           }));
           setRealEmployees(normalized);
+          setEmployeeStatus(normalized);
           try { localStorage.setItem('realEmployees', JSON.stringify(normalized)); } catch {}
+          
+          // Now fetch attendance data after employees are loaded
+          console.log('📊 Fetching attendance data...');
+          setTimeout(() => {
+            checkForEmployeeCheckIns();
+          }, 500);
+        } else {
+          console.error('❌ Failed to fetch employees:', data);
+          // Fallback to localStorage if API fails
+          loadDashboardData();
         }
       } catch (err) {
-        console.error('Failed to fetch employees:', err);
+        console.error('❌ Error fetching employees:', err);
+        // Fallback to localStorage if API fails
+        loadDashboardData();
       }
     };
+    
     fetchEmployees();
     generateAnalyticsData();
-    
-    // Immediately check for any recent check-ins after loading data
-    setTimeout(() => {
-      checkForEmployeeCheckIns();
-    }, 1000);
 
     // Real-time updates via Socket.io
     let socket;
@@ -345,13 +398,21 @@ const AdminDashboard = () => {
     // Set up real-time polling once on component mount
     console.log('🔄 Setting up real-time polling system...');
     
-    // Initial fetch immediately
-    checkForEmployeeCheckIns();
+    // Don't fetch immediately - wait for employees to be loaded first
+    // The initial fetch happens after employees are loaded in the other useEffect
     
     // Check for updates every 3 seconds for more responsive updates
     const realTimeInterval = setInterval(() => {
       console.log('⏰ Polling interval triggered - fetching attendance data...');
-      checkForEmployeeCheckIns();
+      // Only poll if we have employees loaded
+      setRealEmployees(current => {
+        if (current.length > 0) {
+          checkForEmployeeCheckIns();
+        } else {
+          console.warn('⚠️ Skipping poll - no employees loaded yet');
+        }
+        return current;
+      });
     }, 3000);
     
     return () => {
@@ -840,11 +901,40 @@ const AdminDashboard = () => {
 
   const refreshData = async () => {
     setIsRefreshing(true);
-    // Simulate API call
-    setTimeout(() => {
-      loadDashboardData();
+    try {
+      console.log('🔄 Manual refresh triggered');
+      // Reload employees and attendance data
+      const token = localStorage.getItem('token');
+      const resp = await fetch('/api/employees?page=1&limit=100', {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : undefined
+        }
+      });
+      const data = await resp.json();
+      if (resp.ok && Array.isArray(data.employees)) {
+        const normalized = data.employees.map(e => ({
+          id: e._id,
+          name: e.name,
+          email: e.email,
+          department: e.department,
+          role: e.position,
+          status: 'absent',
+          phone: e.phone,
+          checkIn: '-',
+          hours: '0:00',
+          location: 'Office'
+        }));
+        setRealEmployees(normalized);
+        setEmployeeStatus(normalized);
+        
+        // Fetch attendance data
+        await checkForEmployeeCheckIns();
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
       setIsRefreshing(false);
-    }, 1000);
+    }
   };
 
 
