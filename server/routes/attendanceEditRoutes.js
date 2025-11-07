@@ -170,18 +170,41 @@ router.put("/edit-request/:id/:action", authenticateToken, async (req, res) => {
     // If approved, update the attendance record
     if (action === "approve") {
       const attendance = editRequest.attendanceId;
+      
+      // Convert time strings to Date objects
       if (editRequest.requestedInTime) {
-        attendance.inTime = editRequest.requestedInTime;
+        // Parse time string (HH:mm format) and combine with the date
+        const [hours, minutes] = editRequest.requestedInTime.split(':').map(Number);
+        const inTimeDate = new Date(editRequest.date);
+        inTimeDate.setHours(hours || 0, minutes || 0, 0, 0);
+        attendance.inTime = inTimeDate;
       }
+      
       if (editRequest.requestedOutTime) {
-        attendance.outTime = editRequest.requestedOutTime;
+        // Parse time string (HH:mm format) and combine with the date
+        const [hours, minutes] = editRequest.requestedOutTime.split(':').map(Number);
+        const outTimeDate = new Date(editRequest.date);
+        outTimeDate.setHours(hours || 0, minutes || 0, 0, 0);
+        attendance.outTime = outTimeDate;
       }
+      
+      // Recalculate status if needed (ensure it's still "Present" if times are updated)
+      if (attendance.inTime || attendance.outTime) {
+        attendance.status = "Present";
+      }
+      
       await attendance.save();
+      
+      console.log(`✅ Updated attendance record ${attendance._id} with new times:`, {
+        inTime: attendance.inTime,
+        outTime: attendance.outTime
+      });
     }
 
     res.json({
       message: `Edit request ${action}d successfully`,
-      request: editRequest
+      request: editRequest,
+      attendanceUpdated: action === "approve"
     });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
