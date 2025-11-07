@@ -171,26 +171,30 @@ router.put("/edit-request/:id/:action", authenticateToken, async (req, res) => {
     if (action === "approve") {
       const attendance = editRequest.attendanceId;
       
-      // Get the attendance date and extract year, month, day to avoid timezone issues
-      const attendanceDateObj = new Date(attendance.date);
-      const year = attendanceDateObj.getFullYear();
-      const month = attendanceDateObj.getMonth(); // 0-11
-      const day = attendanceDateObj.getDate();
+      // Use the edit request date (which is the date the employee selected)
+      // This ensures we're using the exact date the employee intended
+      const editRequestDate = new Date(editRequest.date);
+      
+      // Extract date components - use the edit request date to ensure consistency
+      // Convert to local date string first to avoid timezone issues
+      const dateStr = editRequestDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+      const [dateYear, dateMonth, dateDay] = dateStr.split('-').map(Number);
       
       // Convert time strings to Date objects
       if (editRequest.requestedInTime) {
         // Parse time string (HH:mm format)
         const [hours, minutes] = editRequest.requestedInTime.split(':').map(Number);
-        // Create a new Date with the exact date and time, avoiding timezone issues
-        const inTimeDate = new Date(year, month, day, hours || 0, minutes || 0, 0, 0);
+        // Create a date in local timezone using the edit request date
+        // This ensures the time is set on the correct date
+        const inTimeDate = new Date(dateYear, dateMonth - 1, dateDay, hours || 0, minutes || 0, 0, 0);
         attendance.inTime = inTimeDate;
       }
       
       if (editRequest.requestedOutTime) {
         // Parse time string (HH:mm format)
         const [hours, minutes] = editRequest.requestedOutTime.split(':').map(Number);
-        // Create a new Date with the exact date and time, avoiding timezone issues
-        const outTimeDate = new Date(year, month, day, hours || 0, minutes || 0, 0, 0);
+        // Create a date in local timezone using the edit request date
+        const outTimeDate = new Date(dateYear, dateMonth - 1, dateDay, hours || 0, minutes || 0, 0, 0);
         attendance.outTime = outTimeDate;
       }
       
@@ -201,7 +205,7 @@ router.put("/edit-request/:id/:action", authenticateToken, async (req, res) => {
       
       await attendance.save();
       
-      // Format times for logging
+      // Format times for logging (using local time to see what will be displayed)
       const formatTimeForLog = (date) => {
         if (!date) return null;
         const d = new Date(date);
@@ -211,7 +215,7 @@ router.put("/edit-request/:id/:action", authenticateToken, async (req, res) => {
       };
       
       console.log(`✅ Updated attendance record ${attendance._id} with new times:`, {
-        attendanceDate: `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+        editRequestDate: dateStr,
         requestedInTime: editRequest.requestedInTime,
         requestedOutTime: editRequest.requestedOutTime,
         storedInTime: formatTimeForLog(attendance.inTime),
