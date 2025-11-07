@@ -254,34 +254,164 @@ const EmployeeDashboard = () => {
     }
   };
 
-  const loadWeeklyData = () => {
-    const today = new Date();
-    const weekStart = startOfWeek(today);
-    const weekEnd = endOfWeek(today);
-    const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+  const loadWeeklyData = async () => {
+    if (!user || (!user.id && !user._id)) {
+      console.error('User not found');
+      return;
+    }
     
-    const weekData = weekDays.map(day => {
-      const dayKey = format(day, 'yyyy-MM-dd');
-      const storageKey = `checkIn_${user.id}_${dayKey}`;
-      const savedData = localStorage.getItem(storageKey);
+    try {
+      const today = new Date();
+      const weekStart = startOfWeek(today);
+      const weekEnd = endOfWeek(today);
+      const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
       
-      if (savedData) {
-        const data = JSON.parse(savedData);
+      // Get current month and year for API call
+      const month = today.getMonth() + 1; // API expects 1-12
+      const year = today.getFullYear();
+      const employeeId = user.id || user._id;
+      
+      // Fetch attendance records from database for current month
+      const response = await fetch(`/api/attendance-records/employee/${employeeId}/${month}/${year}`);
+      const records = response.ok ? await response.json() : [];
+      
+      // Create a map of date string (YYYY-MM-DD) -> attendance record for quick lookup
+      const recordsMap = new Map();
+      records.forEach(record => {
+        const recordDate = new Date(record.date);
+        const dateKey = format(recordDate, 'yyyy-MM-dd');
+        recordsMap.set(dateKey, record);
+      });
+      
+      // Process each day of the week
+      const weekData = weekDays.map(day => {
+        const dateKey = format(day, 'yyyy-MM-dd');
+        const record = recordsMap.get(dateKey);
+        const isToday = isSameDay(day, today);
+        const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+        
+        // Handle weekends
+        if (isWeekend) {
+          return {
+            date: day,
+            worked: '0h 0m',
+            status: 'absent'
+          };
+        }
+        
+        // Handle days with attendance records
+        if (record) {
+          const dbStatus = record.status || 'Present';
+          let worked = '0h 0m';
+          let status = 'absent';
+          
+          if (dbStatus === 'Leave' || dbStatus === 'Holiday' || dbStatus === 'Absent') {
+            status = 'absent';
+          } else if (record.inTime) {
+            if (record.outTime) {
+              // Has check-out time - completed day
+              const checkIn = new Date(record.inTime);
+              const checkOut = new Date(record.outTime);
+              const diffMs = checkOut - checkIn;
+              const hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
+              const hours = Math.floor(hoursWorked);
+              const minutes = Math.round((hoursWorked - hours) * 60);
+              worked = `${hours}h ${minutes}m`;
+              status = 'completed';
+            } else {
+              // Checked in but not checked out yet - active day
+              if (isToday) {
+                status = 'active';
+                // Calculate hours from check-in to now
+                const checkIn = new Date(record.inTime);
+                const now = new Date();
+                const diffMs = now - checkIn;
+                const hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
+                const hours = Math.floor(hoursWorked);
+                const minutes = Math.round((hoursWorked - hours) * 60);
+                worked = `${hours}h ${minutes}m`;
+              } else {
+                // Past day without check-out (shouldn't happen, but handle it)
+                status = 'completed';
+                worked = '0h 0m';
+              }
+            }
+          }
+          
+          return {
+            date: day,
+            worked,
+            status
+          };
+        }
+        
+        // Handle days without records
+        // Check localStorage as fallback for today
+        if (isToday) {
+          const dayKey = format(day, 'yyyy-MM-dd');
+          const storageKey = `checkIn_${employeeId}_${dayKey}`;
+          const savedData = localStorage.getItem(storageKey);
+          
+          if (savedData) {
+            const data = JSON.parse(savedData);
+            if (data.checkedIn && !data.checkOutTime) {
+              return {
+                date: day,
+                worked: data.totalTime || '0h 0m',
+                status: 'active'
+              };
+            } else if (data.totalTime) {
+              return {
+                date: day,
+                worked: data.totalTime,
+                status: 'completed'
+              };
+            }
+          }
+        }
+        
+        // Past days without records are absent
         return {
           date: day,
-          worked: data.totalTime || '0h 0m',
-          status: data.checkedIn ? 'active' : (data.totalTime ? 'completed' : 'absent')
+          worked: '0h 0m',
+          status: isToday ? 'today' : 'absent'
         };
-      }
+      });
       
-      return {
-        date: day,
-        worked: '0h 0m',
-        status: isSameDay(day, today) ? 'today' : 'absent'
-      };
-    });
-    
-    setWeeklyData(weekData);
+      setWeeklyData(weekData);
+      console.log('✅ Loaded weekly data from database');
+    } catch (error) {
+      console.error('Error loading weekly data:', error);
+      // Fallback to localStorage if API fails
+      const today = new Date();
+      const weekStart = startOfWeek(today);
+      const weekEnd = endOfWeek(today);
+      const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+      const employeeId = user.id || user._id;
+      
+      const weekData = weekDays.map(day => {
+        const dayKey = format(day, 'yyyy-MM-dd');
+        const storageKey = `checkIn_${employeeId}_${dayKey}`;
+        const savedData = localStorage.getItem(storageKey);
+        
+        if (savedData) {
+          const data = JSON.parse(savedData);
+          return {
+            date: day,
+            worked: data.totalTime || '0h 0m',
+            status: data.checkedIn ? 'active' : (data.totalTime ? 'completed' : 'absent')
+          };
+        }
+        
+        return {
+          date: day,
+          worked: '0h 0m',
+          status: isSameDay(day, today) ? 'today' : 'absent'
+        };
+      });
+      
+      setWeeklyData(weekData);
+    }
   };
 
   const loadStats = () => {
