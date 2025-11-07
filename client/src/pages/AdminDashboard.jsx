@@ -844,10 +844,18 @@ const AdminDashboard = () => {
           // Create a map of day -> record from API data
           const dayRecordMap = new Map();
           if (apiData && apiData.records) {
-            console.log(`📅 Employee ${employee.name} - Raw records:`, apiData.records);
+            console.log(`📅 Employee ${employee.name} - Raw records:`, JSON.stringify(apiData.records, null, 2));
             apiData.records.forEach(record => {
-              dayRecordMap.set(record.date, record);
-              console.log(`📅 Mapped day ${record.date} for ${employee.name}:`, record);
+              // Ensure date is a number for comparison
+              const dayNum = typeof record.date === 'number' ? record.date : parseInt(record.date);
+              dayRecordMap.set(dayNum, record);
+              console.log(`📅 Mapped day ${dayNum} (type: ${typeof dayNum}) for ${employee.name}:`, {
+                date: record.date,
+                status: record.status,
+                inTime: record.inTime,
+                outTime: record.outTime,
+                hoursWorked: record.hoursWorked
+              });
             });
           }
           
@@ -876,12 +884,23 @@ const AdminDashboard = () => {
               });
             } else {
               // Check if we have a record for this day
-              const dayRecord = dayRecordMap.get(day);
+              // Try both number and string comparison
+              const dayRecord = dayRecordMap.get(day) || dayRecordMap.get(String(day)) || dayRecordMap.get(parseInt(day));
               
               if (dayRecord) {
                 // We have actual attendance data
-                console.log(`📅 Day ${day} for ${employee.name}: Found record`, dayRecord);
-                attendanceRecords.push(dayRecord);
+                console.log(`📅 Day ${day} for ${employee.name}: Found record`, {
+                  date: dayRecord.date,
+                  status: dayRecord.status,
+                  inTime: dayRecord.inTime,
+                  outTime: dayRecord.outTime
+                });
+                // Ensure the record has the correct date
+                const recordWithDate = {
+                  ...dayRecord,
+                  date: day // Ensure date matches the loop day
+                };
+                attendanceRecords.push(recordWithDate);
                 
                 if (dayRecord.status === 'present' || dayRecord.status === 'late') {
                   presentDays++;
@@ -892,7 +911,7 @@ const AdminDashboard = () => {
               } else {
                 // No record found - mark as absent (only log for first few days to avoid spam)
                 if (day <= 5) {
-                  console.log(`📅 Day ${day} for ${employee.name}: No record found - marking as absent`);
+                  console.log(`📅 Day ${day} for ${employee.name}: No record found - marking as absent. Available days in map:`, Array.from(dayRecordMap.keys()));
                 }
                 // No record found - mark as absent
                 attendanceRecords.push({
