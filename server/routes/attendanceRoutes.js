@@ -4,6 +4,15 @@ const Attendance = require("../models/Attendance");
 const Employee = require("../models/Employee");
 const mongoose = require("mongoose");
 
+// Helper function to format time
+const formatTime = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  const hours = d.getHours().toString().padStart(2, '0');
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
+
 // Simplified helper function to find employee - direct approach
 const findEmployeeByAnyId = async (id) => {
   try {
@@ -479,6 +488,105 @@ router.get("/employee/:empId/:month/:year", async (req, res) => {
     res.json(records);
   } catch (error) {
     console.error('Error in GET /employee/:empId/:month/:year:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all employees' attendance for a specific month/year (for admin dashboard)
+router.get("/month/:month/:year", async (req, res) => {
+  const { month, year } = req.params;
+
+  try {
+    console.log('Monthly attendance request received:', { month, year });
+    
+    const monthNum = parseInt(month);
+    const yearNum = parseInt(year);
+    
+    if (isNaN(monthNum) || isNaN(yearNum) || monthNum < 1 || monthNum > 12) {
+      return res.status(400).json({ 
+        error: "Invalid month or year. Month must be 1-12." 
+      });
+    }
+    
+    // Calculate start and end dates for the month
+    const startDate = new Date(yearNum, monthNum - 1, 1);
+    startDate.setHours(0, 0, 0, 0);
+    
+    const endDate = new Date(yearNum, monthNum, 0);
+    endDate.setHours(23, 59, 59, 999);
+    
+    console.log('Fetching attendance records from', startDate, 'to', endDate);
+    
+    // Find all attendance records for the month
+    const attendanceRecords = await Attendance.find({
+      date: {
+        $gte: startDate,
+        $lte: endDate
+      }
+    }).populate('employeeId', 'name department email');
+    
+    // Group records by employee
+    const employeeAttendanceMap = new Map();
+    
+    attendanceRecords.forEach(record => {
+      const empId = String(record.employeeId._id);
+      if (!employeeAttendanceMap.has(empId)) {
+        employeeAttendanceMap.set(empId, {
+          employeeId: empId,
+          employeeName: record.employeeId.name,
+          department: record.employeeId.department,
+          email: record.employeeId.email,
+          records: []
+        });
+      }
+      
+      const recordDate = new Date(record.date);
+      const day = recordDate.getDate();
+      
+      let status = 'present';
+      if (record.status === 'Leave') {
+        status = 'leave';
+      } else if (record.status === 'Absent') {
+        status = 'absent';
+      } else if (record.inTime && record.outTime) {
+        // Check if late (assuming 9 AM is standard start time)
+        const inTime = new Date(record.inTime);
+        const standardStart = new Date(record.date);
+        standardStart.setHours(9, 0, 0, 0);
+        if (inTime > standardStart) {
+          status = 'late';
+        }
+      }
+      
+      // Calculate hours worked
+      let hoursWorked = 0;
+      if (record.inTime && record.outTime) {
+        const inTime = new Date(record.inTime);
+        const outTime = new Date(record.outTime);
+        hoursWorked = (outTime - inTime) / (1000 * 60 * 60);
+      }
+      
+      employeeAttendanceMap.get(empId).records.push({
+        date: day,
+        status: status,
+        inTime: record.inTime ? formatTime(record.inTime) : '',
+        outTime: record.outTime ? formatTime(record.outTime) : '',
+        hoursWorked: hoursWorked.toFixed(1),
+        location: record.location || 'Office'
+      });
+    });
+    
+    // Convert map to array
+    const result = Array.from(employeeAttendanceMap.values());
+    
+    res.json({
+      success: true,
+      month: monthNum,
+      year: yearNum,
+      records: result
+    });
+  } catch (error) {
+    console.error('Error in GET /month/:month/:year:', error);
     res.status(500).json({ error: error.message });
   }
 });
