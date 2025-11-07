@@ -1659,25 +1659,6 @@ const AdminDashboard = () => {
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                       Check-in: {employee.checkIn !== '-' ? employee.checkIn : 'Not checked in'}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '0.75rem' }}>Productivity:</span>
-                      <div style={{
-                        width: '60px',
-                        height: '4px',
-                        background: 'var(--border-color)',
-                        borderRadius: '2px',
-                        overflow: 'hidden'
-                      }}>
-                        <div style={{
-                          width: `${employee.productivity}%`,
-                          height: '100%',
-                          background: employee.productivity >= 90 ? 'var(--success-color)' : 
-                                     employee.productivity >= 75 ? 'var(--warning-color)' : 'var(--danger-color)',
-                          transition: 'width 0.3s ease'
-                        }} />
-                      </div>
-                      <span style={{ fontSize: '0.75rem', fontWeight: '500' }}>{employee.productivity}%</span>
-                    </div>
                   </div>
                 </div>
               ))}
