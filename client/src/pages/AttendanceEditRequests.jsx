@@ -23,6 +23,8 @@ const AttendanceEditRequests = () => {
       const token = localStorage.getItem('token');
       const statusParam = filter === 'all' ? '' : `?status=${filter}`;
       
+      console.log('🔍 Fetching edit requests with filter:', filter);
+      
       const response = await fetch(`/api/attendance-edit/edit-requests${statusParam}`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : undefined
@@ -30,10 +32,22 @@ const AttendanceEditRequests = () => {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch edit requests');
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('❌ Failed to fetch edit requests:', response.status, errorData);
+        throw new Error(errorData.message || 'Failed to fetch edit requests');
       }
       
       const data = await response.json();
+      console.log('📦 Raw data from API:', data);
+      console.log('📦 Data type:', Array.isArray(data) ? 'Array' : typeof data);
+      console.log('📦 Data length:', Array.isArray(data) ? data.length : 'Not an array');
+      
+      // Ensure data is an array
+      if (!Array.isArray(data)) {
+        console.error('❌ API returned non-array data:', data);
+        setRequests([]);
+        return;
+      }
       
       // Process and format the data to match UI expectations
       const formattedRequests = data.map(request => {
@@ -86,8 +100,10 @@ const AttendanceEditRequests = () => {
 
       setRequests(searchedRequests);
       console.log('✅ Loaded', searchedRequests.length, 'edit requests from database');
+      console.log('📋 Formatted requests:', searchedRequests);
     } catch (error) {
-      console.error('Error loading edit requests:', error);
+      console.error('❌ Error loading edit requests:', error);
+      console.error('❌ Error details:', error.message, error.stack);
       setRequests([]);
     } finally {
       setLoading(false);

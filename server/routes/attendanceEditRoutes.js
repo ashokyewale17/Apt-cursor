@@ -11,8 +11,12 @@ router.post("/edit-request", authenticateToken, async (req, res) => {
     const { attendanceId, date, inTime, outTime, reason } = req.body;
     const employeeId = req.user.id;
 
+    console.log('📝 POST /edit-request - Employee ID:', employeeId);
+    console.log('📝 Request data:', { attendanceId, date, inTime, outTime, reason });
+
     // Validate required fields
     if (!attendanceId || !date || !reason) {
+      console.error('❌ Missing required fields');
       return res.status(400).json({ 
         message: "Attendance ID, date, and reason are required" 
       });
@@ -21,11 +25,13 @@ router.post("/edit-request", authenticateToken, async (req, res) => {
     // Check if attendance record exists
     const attendance = await Attendance.findById(attendanceId);
     if (!attendance) {
+      console.error('❌ Attendance record not found:', attendanceId);
       return res.status(404).json({ message: "Attendance record not found" });
     }
 
     // Check if employee owns this attendance record
     if (attendance.employeeId.toString() !== employeeId) {
+      console.error('❌ Employee does not own this attendance record');
       return res.status(403).json({ 
         message: "You can only edit your own attendance records" 
       });
@@ -38,18 +44,33 @@ router.post("/edit-request", authenticateToken, async (req, res) => {
     });
 
     if (existingRequest) {
+      console.error('❌ Pending request already exists for this attendance');
       return res.status(400).json({ 
         message: "There is already a pending edit request for this attendance record" 
       });
     }
+
+    // Format original times for storage
+    const formatTimeForStorage = (time) => {
+      if (!time) return null;
+      if (typeof time === 'string' && time.match(/^\d{2}:\d{2}$/)) {
+        return time; // Already in HH:mm format
+      }
+      if (time instanceof Date) {
+        const hours = String(time.getHours()).padStart(2, '0');
+        const minutes = String(time.getMinutes()).padStart(2, '0');
+        return `${hours}:${minutes}`;
+      }
+      return null;
+    };
 
     // Create edit request
     const editRequest = new AttendanceEditRequest({
       employeeId,
       attendanceId,
       date: new Date(date),
-      originalInTime: attendance.inTime,
-      originalOutTime: attendance.outTime,
+      originalInTime: formatTimeForStorage(attendance.inTime),
+      originalOutTime: formatTimeForStorage(attendance.outTime),
       requestedInTime: inTime,
       requestedOutTime: outTime,
       reason
@@ -57,11 +78,22 @@ router.post("/edit-request", authenticateToken, async (req, res) => {
 
     await editRequest.save();
 
+    console.log('✅ Edit request created successfully:', {
+      id: editRequest._id,
+      employeeId: editRequest.employeeId,
+      attendanceId: editRequest.attendanceId,
+      date: editRequest.date,
+      requestedInTime: editRequest.requestedInTime,
+      requestedOutTime: editRequest.requestedOutTime,
+      status: editRequest.status
+    });
+
     res.status(201).json({
       message: "Attendance edit request submitted successfully",
       requestId: editRequest._id
     });
   } catch (error) {
+    console.error('❌ Error in POST /edit-request:', error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
@@ -107,9 +139,19 @@ router.get("/edit-requests/pending", authenticateToken, async (req, res) => {
 // Get all edit requests (for admin) - with optional status filter
 router.get("/edit-requests", authenticateToken, async (req, res) => {
   try {
+    console.log('🔍 GET /edit-requests - User ID:', req.user.id);
+    
     // Check if user is admin
     const employee = await Employee.findById(req.user.id);
+    if (!employee) {
+      console.error('❌ Employee not found for user ID:', req.user.id);
+      return res.status(404).json({ 
+        message: "Employee not found" 
+      });
+    }
+    
     if (employee.role !== "admin") {
+      console.error('❌ Access denied - User is not admin. Role:', employee.role);
       return res.status(403).json({ 
         message: "Access denied. Admin only." 
       });
@@ -118,14 +160,26 @@ router.get("/edit-requests", authenticateToken, async (req, res) => {
     const { status } = req.query;
     const query = status && status !== 'all' ? { status } : {};
     
+    console.log('🔍 Query for edit requests:', query);
+    
     const requests = await AttendanceEditRequest.find(query)
       .sort({ createdAt: -1 })
       .populate("employeeId", "name email")
       .populate("attendanceId", "inTime outTime date")
       .populate("reviewedBy", "name");
 
+    console.log(`✅ Found ${requests.length} edit requests in database`);
+    console.log('📋 Requests:', requests.map(r => ({
+      id: r._id,
+      employeeId: r.employeeId?._id || r.employeeId,
+      employeeName: r.employeeId?.name || 'Unknown',
+      status: r.status,
+      date: r.date
+    })));
+
     res.json(requests);
   } catch (error) {
+    console.error('❌ Error in GET /edit-requests:', error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
