@@ -456,17 +456,9 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     if (realEmployees.length > 0) {
-      loadMonthlyAttendance(realEmployees);
+      generateMonthlyAttendance(realEmployees);
     }
   }, [realEmployees, selectedMonth, selectedYear]);
-
-  // Reload attendance data when modal opens
-  useEffect(() => {
-    if (showAttendanceModal && realEmployees.length > 0) {
-      console.log('📅 Attendance modal opened - reloading data');
-      loadMonthlyAttendance(realEmployees);
-    }
-  }, [showAttendanceModal, realEmployees.length]);
 
   const generateAnalyticsData = () => {
     const currentDate = new Date();
@@ -774,269 +766,92 @@ const AdminDashboard = () => {
     ];
   };
 
-  // Load real monthly attendance data from API
-  const loadMonthlyAttendance = async (employees) => {
-    if (!employees || employees.length === 0) {
-      console.warn('⚠️ No employees to load attendance for');
-      return;
-    }
-
-    try {
-      console.log('📅 Loading monthly attendance data for', selectedMonth + 1, selectedYear);
-      console.log('📅 Employees count:', employees.length);
+  const generateMonthlyAttendance = (employees) => {
+    const monthlyData = employees.map(employee => {
+      const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+      const attendanceRecords = [];
+      let presentDays = 0;
+      let totalHours = 0;
+      let leaveDays = 0;
       
-      // Note: selectedMonth is 0-indexed (0-11), API expects 1-12
-      const monthParam = selectedMonth + 1;
-      const url = `/api/attendance-records/month/${monthParam}/${selectedYear}`;
-      console.log('📅 Fetching from:', url);
-      
-      const response = await fetch(url);
-      const data = await response.json();
-      
-      console.log('📅 API Response:', {
-        ok: response.ok,
-        success: data.success,
-        recordsCount: data.records ? data.records.length : 0,
-        error: data.error
-      });
-      
-      if (response.ok && data.success && Array.isArray(data.records)) {
-        console.log('✅ Fetched', data.records.length, 'employee attendance records');
-        if (data.records.length > 0) {
-          console.log('📅 Sample record (full):', JSON.stringify(data.records[0], null, 2));
-          console.log('📅 Sample record records array:', data.records[0].records);
-          if (data.records[0].records && data.records[0].records.length > 0) {
-            console.log('📅 Sample day record:', JSON.stringify(data.records[0].records[0], null, 2));
-          }
-        }
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(selectedYear, selectedMonth, day);
+        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
         
-        const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-        
-        // Create a map of employee attendance data from API
-        const apiDataMap = new Map();
-        data.records.forEach(empData => {
-          // Normalize employee ID to string for comparison
-          const normalizedId = String(empData.employeeId);
-          apiDataMap.set(normalizedId, empData);
-          console.log('📅 Mapped employee:', normalizedId, '->', empData.employeeName);
-        });
-        
-        console.log('📅 API Data Map keys:', Array.from(apiDataMap.keys()));
-        console.log('📅 Employee IDs:', employees.map(e => String(e.id)));
-        
-        // Process each employee
-        const monthlyData = employees.map(employee => {
-          const empId = String(employee.id);
-          const apiData = apiDataMap.get(empId);
+        if (!isWeekend && date <= new Date()) {
+          const isPresent = Math.random() > 0.1; // 90% attendance rate
+          const isLate = Math.random() < 0.15; // 15% late rate
+          const isOnLeave = Math.random() < 0.05; // 5% leave rate
           
-          console.log(`📅 Processing employee ${employee.name} (ID: ${empId})`, {
-            hasApiData: !!apiData,
-            recordCount: apiData ? apiData.records.length : 0,
-            sampleRecord: apiData && apiData.records.length > 0 ? apiData.records[0] : null
-          });
+          let status = 'present';
+          let inTime = '';
+          let outTime = '';
+          let hoursWorked = 0;
           
-          // Initialize arrays for all days in month
-          const attendanceRecords = [];
-          let presentDays = 0;
-          let totalHours = 0;
-          let leaveDays = 0;
-          
-          // Create a map of day -> record from API data
-          const dayRecordMap = new Map();
-          if (apiData && apiData.records) {
-            console.log(`📅 Employee ${employee.name} - Raw records:`, JSON.stringify(apiData.records, null, 2));
-            apiData.records.forEach(record => {
-              // Ensure date is a number for comparison
-              const dayNum = typeof record.date === 'number' ? record.date : parseInt(record.date);
-              dayRecordMap.set(dayNum, record);
-              console.log(`📅 Mapped day ${dayNum} (type: ${typeof dayNum}) for ${employee.name}:`, {
-                date: record.date,
-                status: record.status,
-                inTime: record.inTime,
-                outTime: record.outTime,
-                hoursWorked: record.hoursWorked
-              });
-            });
-          }
-          
-          // Process each day of the month
-          for (let day = 1; day <= daysInMonth; day++) {
-            const date = new Date(selectedYear, selectedMonth, day);
-            const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-            const isFuture = date > new Date();
+          if (isOnLeave) {
+            status = 'leave';
+            leaveDays++;
+          } else if (isPresent) {
+            const baseInHour = isLate ? 9 + Math.floor(Math.random() * 2) : 8 + Math.floor(Math.random() * 2);
+            const inMinutes = Math.floor(Math.random() * 60);
+            const outHour = baseInHour + 8 + Math.floor(Math.random() * 2);
+            const outMinutes = Math.floor(Math.random() * 60);
             
-            if (isWeekend) {
-              attendanceRecords.push({
-                date: day,
-                status: 'weekend',
-                inTime: '',
-                outTime: '',
-                hoursWorked: '0'
-              });
-            } else if (isFuture) {
-              // Future dates - no data
-              attendanceRecords.push({
-                date: day,
-                status: 'future',
-                inTime: '',
-                outTime: '',
-                hoursWorked: '0'
-              });
-            } else {
-              // Check if we have a record for this day
-              // Try both number and string comparison
-              const dayRecord = dayRecordMap.get(day) || dayRecordMap.get(String(day)) || dayRecordMap.get(parseInt(day));
-              
-              if (dayRecord) {
-                // We have actual attendance data
-                console.log(`📅 Day ${day} for ${employee.name}: Found record`, {
-                  date: dayRecord.date,
-                  status: dayRecord.status,
-                  inTime: dayRecord.inTime,
-                  outTime: dayRecord.outTime
-                });
-                // Ensure the record has the correct date
-                const recordWithDate = {
-                  ...dayRecord,
-                  date: day // Ensure date matches the loop day
-                };
-                attendanceRecords.push(recordWithDate);
-                
-                if (dayRecord.status === 'present' || dayRecord.status === 'late') {
-                  presentDays++;
-                  totalHours += parseFloat(dayRecord.hoursWorked || 0);
-                } else if (dayRecord.status === 'leave') {
-                  leaveDays++;
-                }
-              } else {
-                // No record found - mark as absent (only log for first few days to avoid spam)
-                if (day <= 5) {
-                  console.log(`📅 Day ${day} for ${employee.name}: No record found - marking as absent. Available days in map:`, Array.from(dayRecordMap.keys()));
-                }
-                // No record found - mark as absent
-                attendanceRecords.push({
-                  date: day,
-                  status: 'absent',
-                  inTime: '',
-                  outTime: '',
-                  hoursWorked: '0'
-                });
-              }
+            inTime = `${baseInHour.toString().padStart(2, '0')}:${inMinutes.toString().padStart(2, '0')}`;
+            outTime = `${outHour.toString().padStart(2, '0')}:${outMinutes.toString().padStart(2, '0')}`;
+            
+            const inDate = new Date(date);
+            inDate.setHours(baseInHour, inMinutes);
+
+            const outDate = new Date(date);
+            outDate.setHours(outHour, outMinutes);
+            
+            hoursWorked = (outDate - inDate) / (1000 * 60 * 60);
+            totalHours += hoursWorked;
+            presentDays++;
+            
+            if (isLate) {
+              status = 'late';
             }
+          } else {
+            status = 'absent';
           }
           
-          // Calculate summary statistics
-          const workingDays = attendanceRecords.filter(r => 
-            r.status !== 'weekend' && r.status !== 'future'
-          ).length;
-          
-          const avgHours = presentDays > 0 ? (totalHours / presentDays).toFixed(1) : '0.0';
-          const attendanceRate = workingDays > 0 
-            ? ((presentDays / workingDays) * 100).toFixed(1) 
-            : '0.0';
-          
-          return {
-            employee,
-            attendanceRecords,
-            summary: {
-              presentDays,
-              leaveDays,
-              totalHours: totalHours.toFixed(1),
-              avgHours,
-              attendanceRate
-            }
-          };
-        });
-        
-        setMonthlyAttendance(monthlyData);
-        console.log('✅ Monthly attendance data loaded successfully');
-        console.log('📅 Monthly data summary:', monthlyData.map(emp => ({
-          name: emp.employee.name,
-          presentDays: emp.summary.presentDays,
-          leaveDays: emp.summary.leaveDays,
-          totalHours: emp.summary.totalHours,
-          recordsCount: emp.attendanceRecords.length,
-          sampleRecords: emp.attendanceRecords.slice(0, 3) // First 3 records
-        })));
-        
-        // Log a sample employee's full data
-        if (monthlyData.length > 0) {
-          const sampleEmp = monthlyData[0];
-          console.log('📅 Sample employee full data:', {
-            name: sampleEmp.employee.name,
-            summary: sampleEmp.summary,
-            first5Records: sampleEmp.attendanceRecords.slice(0, 5)
-          });
-        }
-      } else {
-        console.error('❌ Failed to fetch monthly attendance:', data.error || 'Unknown error');
-        console.error('❌ Response status:', response.status);
-        console.error('❌ Response data:', data);
-        // Fallback to empty data structure with all employees
-        const emptyData = employees.map(employee => {
-          const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-          const attendanceRecords = [];
-          
-          for (let day = 1; day <= daysInMonth; day++) {
-            const date = new Date(selectedYear, selectedMonth, day);
-            const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-            attendanceRecords.push({
-              date: day,
-              status: isWeekend ? 'weekend' : 'absent',
-              inTime: '',
-              outTime: '',
-              hoursWorked: '0'
-            });
-          }
-          
-          return {
-            employee,
-            attendanceRecords,
-            summary: {
-              presentDays: 0,
-              leaveDays: 0,
-              totalHours: '0.0',
-              avgHours: '0.0',
-              attendanceRate: '0.0'
-            }
-          };
-        });
-        setMonthlyAttendance(emptyData);
-      }
-    } catch (error) {
-      console.error('❌ Error loading monthly attendance:', error);
-      console.error('❌ Error stack:', error.stack);
-      // Fallback to empty data structure
-      const emptyData = employees.map(employee => {
-        const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-        const attendanceRecords = [];
-        
-        for (let day = 1; day <= daysInMonth; day++) {
-          const date = new Date(selectedYear, selectedMonth, day);
-          const isWeekend = date.getDay() === 0 || date.getDay() === 6;
           attendanceRecords.push({
             date: day,
-            status: isWeekend ? 'weekend' : 'absent',
+            status,
+            inTime,
+            outTime,
+            hoursWorked: hoursWorked.toFixed(1)
+          });
+        } else if (isWeekend) {
+          attendanceRecords.push({
+            date: day,
+            status: 'weekend',
             inTime: '',
             outTime: '',
             hoursWorked: '0'
           });
         }
-        
-        return {
-          employee,
-          attendanceRecords,
-          summary: {
-            presentDays: 0,
-            leaveDays: 0,
-            totalHours: '0.0',
-            avgHours: '0.0',
-            attendanceRate: '0.0'
-          }
-        };
-      });
-      setMonthlyAttendance(emptyData);
-    }
+      }
+      
+      const avgHoursDecimal = presentDays > 0 ? (totalHours / presentDays) : 0;
+      const avgHours = presentDays > 0 ? (totalHours / presentDays).toFixed(1) : '0.0';
+      
+      return {
+        employee,
+        attendanceRecords,
+        summary: {
+          presentDays,
+          leaveDays,
+          totalHours: totalHours.toFixed(1),
+          avgHours,
+          attendanceRate: ((presentDays / (daysInMonth - 8)) * 100).toFixed(1) // Excluding weekends
+        }
+      };
+    });
+    
+    setMonthlyAttendance(monthlyData);
   };
 
 
@@ -1044,10 +859,8 @@ const AdminDashboard = () => {
   const handleMonthChange = (month, year) => {
     setSelectedMonth(month);
     setSelectedYear(year);
-    // Reload attendance data for new month
-    if (realEmployees.length > 0) {
-      loadMonthlyAttendance(realEmployees);
-    }
+    // Regenerate attendance data for new month
+    generateMonthlyAttendance(realEmployees);
   };
 
   const getStatusBadge = (status) => {
@@ -3378,39 +3191,34 @@ const AdminDashboard = () => {
                   maxWidth: '100%',
                   position: 'relative'
                 }}>
-                  {monthlyAttendance.length === 0 ? (
-                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      <p>No attendance data available for this month.</p>
-                    </div>
-                  ) : (
-                    <table style={{ 
-                      width: '100%', 
-                      borderCollapse: 'collapse',
-                      minWidth: '800px' // Ensure minimum width for proper layout
-                    }}>
-                      <thead>
-                        <tr style={{ background: 'var(--background-alt)' }}>
-                          <th style={{ 
-                            padding: '1rem', 
-                            textAlign: 'left', 
-                            borderBottom: '2px solid var(--border-color)',
-                            fontWeight: '600',
-                            position: 'sticky',
-                            left: 0,
-                            background: 'var(--background-alt)',
-                            zIndex: 1
-                          }}>
-                            Employee
-                          </th>
-                          <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Present Days</th>
-                          <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Leave Days</th>
-                          <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Total Hours</th>
-                          <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Avg Hours</th>
-                          <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Attendance Rate</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {monthlyAttendance.map((employeeData, index) => (
+                  <table style={{ 
+                    width: '100%', 
+                    borderCollapse: 'collapse',
+                    minWidth: '800px' // Ensure minimum width for proper layout
+                  }}>
+                    <thead>
+                      <tr style={{ background: 'var(--background-alt)' }}>
+                        <th style={{ 
+                          padding: '1rem', 
+                          textAlign: 'left', 
+                          borderBottom: '2px solid var(--border-color)',
+                          fontWeight: '600',
+                          position: 'sticky',
+                          left: 0,
+                          background: 'var(--background-alt)',
+                          zIndex: 1
+                        }}>
+                          Employee
+                        </th>
+                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Present Days</th>
+                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Leave Days</th>
+                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Total Hours</th>
+                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Avg Hours</th>
+                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Attendance Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyAttendance.map((employeeData, index) => (
                         <tr key={employeeData.employee.id} style={{
                           background: index % 2 === 0 ? 'white' : 'var(--background-alt)',
                           transition: 'background 0.2s ease'
@@ -3515,12 +3323,7 @@ const AdminDashboard = () => {
               ) : (
                 /* Calendar View */
                 <div style={{ overflowX: 'auto' }}>
-                  {monthlyAttendance.length === 0 ? (
-                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      <p>No attendance data available for this month.</p>
-                    </div>
-                  ) : (
-                    monthlyAttendance.map((empData) => (
+                  {monthlyAttendance.map((empData) => (
                     <div key={empData.employee.id} style={{ marginBottom: '2rem' }}>
                       {/* Employee Header */}
                       <div style={{
@@ -3645,7 +3448,7 @@ const AdminDashboard = () => {
                                 }}>
                                   {day}
                                 </div>
-                                {record ? (
+                                {record && (
                                   <div>
                                     <div style={{
                                       fontSize: '0.625rem',
@@ -3656,20 +3459,14 @@ const AdminDashboard = () => {
                                         record.status === 'present' ? '#d1fae5' :
                                         record.status === 'late' ? '#fef3c7' :
                                         record.status === 'absent' ? '#fee2e2' :
-                                        record.status === 'leave' ? '#dbeafe' :
-                                        record.status === 'weekend' ? '#f3f4f6' :
-                                        record.status === 'future' ? '#f9fafb' : '#f3f4f6',
+                                        record.status === 'leave' ? '#dbeafe' : '#f3f4f6',
                                       color:
                                         record.status === 'present' ? '#065f46' :
                                         record.status === 'late' ? '#92400e' :
                                         record.status === 'absent' ? '#991b1b' :
-                                        record.status === 'leave' ? '#1e40af' :
-                                        record.status === 'weekend' ? '#6b7280' :
-                                        record.status === 'future' ? '#9ca3af' : '#6b7280'
+                                        record.status === 'leave' ? '#1e40af' : '#6b7280'
                                     }}>
-                                      {record.status === 'weekend' ? 'OFF' : 
-                                       record.status === 'future' ? '—' : 
-                                       record.status.toUpperCase()}
+                                      {record.status === 'weekend' ? 'OFF' : record.status.toUpperCase()}
                                     </div>
                                     {record.inTime && (
                                       <div style={{ fontSize: '0.625rem', color: 'var(--text-secondary)' }}>
@@ -3687,16 +3484,6 @@ const AdminDashboard = () => {
                                       </div>
                                     )}
                                   </div>
-                                ) : (
-                                  <div style={{
-                                    fontSize: '0.625rem',
-                                    padding: '0.125rem 0.25rem',
-                                    borderRadius: '0.25rem',
-                                    background: '#fee2e2',
-                                    color: '#991b1b'
-                                  }}>
-                                    ABSENT
-                                  </div>
                                 )}
                               </div>
                             );
@@ -3704,8 +3491,7 @@ const AdminDashboard = () => {
                         </div>
                       </div>
                     </div>
-                    ))}
-                  )}
+                  ))}
                 </div>
               )}
             </div>
