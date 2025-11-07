@@ -152,8 +152,16 @@ const AdminDashboard = () => {
   const checkForEmployeeCheckIns = useCallback(async () => {
     try {
       console.log('🔄 Polling for attendance updates...');
-      // Fetch today's attendance records from database
-      const response = await fetch('/api/attendance-records/today/all');
+      // Fetch today's attendance records from database with cache-busting
+      const timestamp = Date.now();
+      const response = await fetch(`/api/attendance-records/today/all?_t=${timestamp}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       const data = await response.json();
       
       if (response.ok && data.success && Array.isArray(data.records)) {
@@ -241,20 +249,37 @@ const AdminDashboard = () => {
         withCredentials: false,
         reconnection: true,
         reconnectionDelay: 1000,
-        reconnectionAttempts: 5
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: Infinity,
+        timeout: 20000,
+        forceNew: false
       });
       
       socket.on('connect', () => {
         console.log('✅ Socket.io connected:', socket.id);
         socket.emit('join', 'admin');
+        // Immediately refresh data when socket connects
+        checkForEmployeeCheckIns();
       });
 
-      socket.on('disconnect', () => {
-        console.log('❌ Socket.io disconnected');
+      socket.on('disconnect', (reason) => {
+        console.log('❌ Socket.io disconnected:', reason);
+        // If disconnected, increase polling frequency as fallback
+        if (reason === 'io server disconnect') {
+          // Server disconnected, reconnect manually
+          socket.connect();
+        }
+      });
+
+      socket.on('reconnect', (attemptNumber) => {
+        console.log('🔄 Socket.io reconnected after', attemptNumber, 'attempts');
+        // Refresh data when reconnected
+        checkForEmployeeCheckIns();
       });
 
       socket.on('connect_error', (error) => {
         console.error('Socket.io connection error:', error);
+        // On connection error, ensure polling continues
       });
 
       socket.on('employeeCheckIn', (evt) => {
@@ -348,15 +373,37 @@ const AdminDashboard = () => {
     // Initial fetch immediately
     checkForEmployeeCheckIns();
     
-    // Check for updates every 3 seconds for more responsive updates
+    // Check for updates every 2 seconds for more responsive updates
+    // Reduced from 3 seconds to ensure faster sync across devices
     const realTimeInterval = setInterval(() => {
       console.log('⏰ Polling interval triggered - fetching attendance data...');
       checkForEmployeeCheckIns();
-    }, 3000);
+    }, 2000);
+    
+    // Handle page visibility changes (important for mobile browsers)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('📱 Page became visible - refreshing attendance data');
+        // Immediately refresh when page becomes visible
+        checkForEmployeeCheckIns();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Handle focus events (when user switches back to tab/window)
+    const handleFocus = () => {
+      console.log('👁️ Window focused - refreshing attendance data');
+      checkForEmployeeCheckIns();
+    };
+    
+    window.addEventListener('focus', handleFocus);
     
     return () => {
       console.log('🧹 Cleaning up real-time polling system');
       clearInterval(realTimeInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [checkForEmployeeCheckIns]); // Include checkForEmployeeCheckIns in dependencies
 

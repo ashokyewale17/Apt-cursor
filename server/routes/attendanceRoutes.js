@@ -424,6 +424,13 @@ router.get("/today/all", async (req, res) => {
   try {
     console.log('Today attendance for all employees request received');
     
+    // Set cache-control headers to prevent caching
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    
     // Get today's date
     const today = new Date();
     today.setHours(0, 0, 0, 0);
