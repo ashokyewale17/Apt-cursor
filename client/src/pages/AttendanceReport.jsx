@@ -147,9 +147,12 @@ const AttendanceReport = () => {
                   const outTimeDate = new Date(record.outTime);
                   outTime = format(outTimeDate, 'HH:mm');
                   
-                  // Calculate hours worked
+                  // Calculate hours worked with proper precision
                   const diffMs = outTimeDate - inTimeDate;
                   hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
+                  
+                  // Round to 2 decimal places for consistency (then we'll round to 1 decimal for display)
+                  hoursWorked = Math.round(hoursWorked * 100) / 100;
                   
                   // Determine if early leave (check-out before 5:00 PM and worked less than 6 hours)
                   const earlyThreshold = new Date(outTimeDate);
@@ -175,6 +178,7 @@ const AttendanceReport = () => {
                     presentDays++;
                   }
                   
+                  // Add rounded hours to total to ensure consistency
                   totalHours += hoursWorked;
                 } else {
                   // Checked in but not checked out yet
@@ -208,7 +212,18 @@ const AttendanceReport = () => {
           }
         }
         
-        const avgHours = presentDays > 0 ? (totalHours / presentDays).toFixed(1) : '0.0';
+        // Recalculate total from stored rounded values to ensure consistency
+        // This ensures the total matches the sum of individual day hours
+        let recalculatedTotal = 0;
+        attendanceRecords.forEach(record => {
+          if (record.hoursWorked && record.hoursWorked !== '0') {
+            recalculatedTotal += parseFloat(record.hoursWorked);
+          }
+        });
+        
+        // Round to 2 decimal places for consistency, then to 1 decimal for display
+        const roundedTotalHours = Math.round(recalculatedTotal * 100) / 100;
+        const avgHours = presentDays > 0 ? (Math.round((roundedTotalHours / presentDays) * 100) / 100).toFixed(1) : '0.0';
         const attendanceRate = workingDays > 0 ? ((presentDays / workingDays) * 100).toFixed(1) : '0.0';
         
         return {
@@ -219,7 +234,7 @@ const AttendanceReport = () => {
             leaveDays,
             earlyLeaveDays,
             halfDays,
-            totalHours: totalHours.toFixed(1),
+            totalHours: roundedTotalHours.toFixed(1),
             avgHours,
             attendanceRate
           }
@@ -262,13 +277,24 @@ const AttendanceReport = () => {
   };
 
   const convertDecimalToHoursMinutes = (decimalHours) => {
-    const hours = Math.floor(decimalHours);
-    const minutes = Math.round((decimalHours - hours) * 60);
-    // Handle case where minutes round to 60
-    if (minutes === 60) {
-      return `${hours + 1}h 0m`;
+    // Handle string inputs and ensure we have a number
+    const hours = parseFloat(decimalHours);
+    if (isNaN(hours) || hours === 0) {
+      return '0h 0m';
     }
-    return `${hours}h ${minutes}m`;
+    
+    // Calculate hours and minutes with proper rounding
+    const totalHours = Math.floor(hours);
+    const decimalPart = hours - totalHours;
+    // Round minutes to nearest integer, but handle edge cases
+    const totalMinutes = Math.round(decimalPart * 60);
+    
+    // Handle case where minutes round to 60
+    if (totalMinutes === 60) {
+      return `${totalHours + 1}h 0m`;
+    }
+    
+    return `${totalHours}h ${totalMinutes}m`;
   };
 
   const handleExportReport = () => {
