@@ -28,214 +28,211 @@ const AttendanceReport = () => {
     }
   }, [realEmployees, selectedMonth, selectedYear]);
 
-  const loadEmployeeData = () => {
-    // Using the same employee data structure as AdminDashboard
-    const employees = [
-      {
-        id: 1,
-        name: 'Tushar Mhaskar',
-        email: 'tushar.mhaskar@company.com',
-        department: 'Admin',
-        role: 'Admin & HR',
-        status: 'active',
-        joinDate: '2023-01-15',
-        phone: '+91-9876543210'
-      },
-      {
-        id: 2,
-        name: 'Vijay Solanki',
-        email: 'vijay.solanki@company.com',
-        department: 'Testing',
-        role: 'QA Engineer',
-        status: 'active',
-        joinDate: '2023-02-20',
-        phone: '+91-9876543211'
-      },
-      {
-        id: 3,
-        name: 'Pinky Chakrabarty',
-        email: 'pinky.chakrabarty@company.com',
-        department: 'Operations',
-        role: 'Operations Manager',
-        status: 'active',
-        joinDate: '2023-01-10',
-        phone: '+91-9876543212'
-      },
-      {
-        id: 4,
-        name: 'Sanket Pawal',
-        email: 'sanket.pawal@company.com',
-        department: 'Design',
-        role: 'UI/UX Designer',
-        status: 'active',
-        joinDate: '2023-03-05',
-        phone: '+91-9876543213'
-      },
-      {
-        id: 5,
-        name: 'Ashok Yewale',
-        email: 'ashok.yewale@company.com',
-        department: 'Software',
-        role: 'Software Developer',
-        status: 'active',
-        joinDate: '2023-02-01',
-        phone: '+91-9876543214'
-      },
-      {
-        id: 6,
-        name: 'Harshal Lohar',
-        email: 'harshal.lohar@company.com',
-        department: 'Software',
-        role: 'Senior Developer',
-        status: 'absent',
-        joinDate: '2022-12-15',
-        phone: '+91-9876543215'
-      },
-      {
-        id: 7,
-        name: 'Prasanna Pandit',
-        email: 'prasanna.pandit@company.com',
-        department: 'Embedded',
-        role: 'Embedded Engineer',
-        status: 'late',
-        joinDate: '2023-03-20',
-        phone: '+91-9876543216'
+  const loadEmployeeData = async () => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('token');
+      const resp = await fetch('/api/employees?page=1&limit=100', {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : undefined
+        }
+      });
+      const data = await resp.json();
+      if (resp.ok && Array.isArray(data.employees)) {
+        // Normalize to match existing UI shape
+        const normalized = data.employees.map(e => ({
+          id: e._id,
+          name: e.name,
+          email: e.email,
+          department: e.department,
+          role: e.position,
+          status: e.isActive ? 'active' : 'inactive',
+          phone: e.phone
+        }));
+        setRealEmployees(normalized);
+        console.log('✅ Loaded', normalized.length, 'employees from database');
+      } else {
+        console.error('Failed to fetch employees:', data);
       }
-    ];
-
-    setRealEmployees(employees);
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const generateMonthlyAttendance = (employees) => {
+  const generateMonthlyAttendance = async (employees) => {
     if (!employees || employees.length === 0) return;
     
     setIsLoading(true);
     
-    const monthlyData = employees.map(employee => {
+    try {
+      // Fetch attendance data for all employees in parallel
+      const attendancePromises = employees.map(async (employee) => {
+        try {
+          const month = selectedMonth + 1; // API expects 1-12, not 0-11
+          const response = await fetch(`/api/attendance-records/employee/${employee.id}/${month}/${selectedYear}`);
+          const records = await response.ok ? await response.json() : [];
+          
+          return { employee, records: Array.isArray(records) ? records : [] };
+        } catch (error) {
+          console.error(`Error fetching attendance for employee ${employee.id}:`, error);
+          return { employee, records: [] };
+        }
+      });
+      
+      const attendanceData = await Promise.all(attendancePromises);
+      
       const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-      const attendanceRecords = [];
-      let presentDays = 0;
-      let totalHours = 0;
-      let leaveDays = 0;
-      let earlyLeaveDays = 0;
-      let halfDays = 0;
-      let workingDays = 0;
-      
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(selectedYear, selectedMonth, day);
-        const isWeekendDay = date.getDay() === 0 || date.getDay() === 6;
+      const monthlyData = attendanceData.map(({ employee, records }) => {
+        const attendanceRecords = [];
+        let presentDays = 0;
+        let totalHours = 0;
+        let leaveDays = 0;
+        let earlyLeaveDays = 0;
+        let halfDays = 0;
+        let workingDays = 0;
         
-        if (!isWeekendDay && date <= new Date()) {
-          workingDays++;
-          const isOnLeave = Math.random() < 0.05; // 5% leave rate
-          const isLate = Math.random() < 0.15; // 15% late rate
-          const isEarlyLeave = Math.random() < 0.08; // 8% early leave rate
-          const isHalfDay = Math.random() < 0.05; // 5% half day rate
-          const isPresent = !isOnLeave && Math.random() > 0.08; // 92% attendance rate
+        // Create a map of date -> attendance record for quick lookup
+        const recordsMap = new Map();
+        records.forEach(record => {
+          const recordDate = new Date(record.date);
+          const day = recordDate.getDate();
+          recordsMap.set(day, record);
+        });
+        
+        // Process each day of the month
+        for (let day = 1; day <= daysInMonth; day++) {
+          const date = new Date(selectedYear, selectedMonth, day);
+          const isWeekendDay = date.getDay() === 0 || date.getDay() === 6;
+          const record = recordsMap.get(day);
           
-          let status = 'present';
-          let inTime = '';
-          let outTime = '';
-          let hoursWorked = 0;
-          
-          if (isOnLeave) {
-            status = 'leave';
-            leaveDays++;
-          } else if (isHalfDay) {
-            status = 'half';
-            halfDays++;
-            // Half day: 4 hours work
-            const baseInHour = 9;
-            const inMinutes = Math.floor(Math.random() * 60);
-            const outHour = 13;
-            const outMinutes = Math.floor(Math.random() * 60);
+          if (isWeekendDay) {
+            attendanceRecords.push({
+              date: day,
+              status: 'weekend',
+              inTime: '',
+              outTime: '',
+              hoursWorked: '0'
+            });
+          } else if (date <= new Date()) {
+            workingDays++;
             
-            inTime = `${baseInHour.toString().padStart(2, '0')}:${inMinutes.toString().padStart(2, '0')}`;
-            outTime = `${outHour.toString().padStart(2, '0')}:${outMinutes.toString().padStart(2, '0')}`;
+            let status = 'absent';
+            let inTime = '';
+            let outTime = '';
+            let hoursWorked = 0;
             
-            const inDate = new Date(date);
-            inDate.setHours(baseInHour, inMinutes);
-            const outDate = new Date(date);
-            outDate.setHours(outHour, outMinutes);
+            if (record) {
+              // Map database status to UI status
+              const dbStatus = record.status || 'Present';
+              
+              if (dbStatus === 'Leave' || dbStatus === 'Holiday') {
+                status = 'leave';
+                leaveDays++;
+              } else if (dbStatus === 'Absent') {
+                status = 'absent';
+              } else if (record.inTime) {
+                // Has check-in time
+                const inTimeDate = new Date(record.inTime);
+                inTime = format(inTimeDate, 'HH:mm');
+                
+                // Determine if late (check-in after 9:30 AM)
+                const lateThreshold = new Date(inTimeDate);
+                lateThreshold.setHours(9, 30, 0, 0);
+                const isLate = inTimeDate > lateThreshold;
+                
+                if (record.outTime) {
+                  // Has check-out time
+                  const outTimeDate = new Date(record.outTime);
+                  outTime = format(outTimeDate, 'HH:mm');
+                  
+                  // Calculate hours worked
+                  const diffMs = outTimeDate - inTimeDate;
+                  hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
+                  
+                  // Determine if early leave (check-out before 5:00 PM and worked less than 6 hours)
+                  const earlyThreshold = new Date(outTimeDate);
+                  earlyThreshold.setHours(17, 0, 0, 0);
+                  const isEarlyLeave = outTimeDate < earlyThreshold && hoursWorked < 6;
+                  
+                  // Determine if half day (worked less than 4.5 hours)
+                  const isHalfDay = hoursWorked < 4.5 && hoursWorked >= 2;
+                  
+                  if (isHalfDay) {
+                    status = 'half';
+                    halfDays++;
+                    presentDays++;
+                  } else if (isEarlyLeave) {
+                    status = 'early';
+                    earlyLeaveDays++;
+                    presentDays++;
+                  } else if (isLate) {
+                    status = 'late';
+                    presentDays++;
+                  } else {
+                    status = 'present';
+                    presentDays++;
+                  }
+                  
+                  totalHours += hoursWorked;
+                } else {
+                  // Checked in but not checked out yet
+                  status = isLate ? 'late' : 'present';
+                  presentDays++;
+                  // Don't count hours if not checked out
+                }
+              } else {
+                // Present status but no inTime (shouldn't happen, but handle it)
+                status = 'present';
+                presentDays++;
+              }
+            }
             
-            hoursWorked = Math.max(0, (outDate - inDate) / (1000 * 60 * 60));
-            totalHours += hoursWorked;
-            presentDays++;
-          } else if (!isPresent) {
-            status = 'absent';
+            attendanceRecords.push({
+              date: day,
+              status,
+              inTime,
+              outTime,
+              hoursWorked: hoursWorked.toFixed(1)
+            });
           } else {
-            const baseInHour = isLate ? 9 + Math.floor(Math.random() * 2) : 8 + Math.floor(Math.random() * 2);
-            const inMinutes = Math.floor(Math.random() * 60);
-            
-            // Regular day or early leave
-            let outHour, outMinutes;
-            if (isEarlyLeave) {
-              status = 'early';
-              earlyLeaveDays++;
-              // Early leave: leave 2-4 hours early
-              outHour = 14 + Math.floor(Math.random() * 2);
-              outMinutes = Math.floor(Math.random() * 60);
-            } else {
-              // Regular day
-              outHour = Math.min(19, baseInHour + 8 + Math.floor(Math.random() * 2));
-              outMinutes = Math.floor(Math.random() * 60);
-            }
-            
-            inTime = `${baseInHour.toString().padStart(2, '0')}:${inMinutes.toString().padStart(2, '0')}`;
-            outTime = `${outHour.toString().padStart(2, '0')}:${outMinutes.toString().padStart(2, '0')}`;
-            
-            const inDate = new Date(date);
-            inDate.setHours(baseInHour, inMinutes);
-            const outDate = new Date(date);
-            outDate.setHours(outHour, outMinutes);
-            
-            hoursWorked = Math.max(0, (outDate - inDate) / (1000 * 60 * 60));
-            totalHours += hoursWorked;
-            presentDays++;
-            
-            if (isLate && status !== 'early') {
-              status = 'late';
-            }
+            // Future date - no data yet
+            attendanceRecords.push({
+              date: day,
+              status: 'future',
+              inTime: '',
+              outTime: '',
+              hoursWorked: '0'
+            });
           }
-          
-          attendanceRecords.push({
-            date: day,
-            status,
-            inTime,
-            outTime,
-            hoursWorked: hoursWorked.toFixed(1)
-          });
-        } else if (isWeekendDay) {
-          attendanceRecords.push({
-            date: day,
-            status: 'weekend',
-            inTime: '',
-            outTime: '',
-            hoursWorked: '0'
-          });
         }
-      }
+        
+        const avgHours = presentDays > 0 ? (totalHours / presentDays).toFixed(1) : '0.0';
+        const attendanceRate = workingDays > 0 ? ((presentDays / workingDays) * 100).toFixed(1) : '0.0';
+        
+        return {
+          employee,
+          attendanceRecords,
+          summary: {
+            presentDays,
+            leaveDays,
+            earlyLeaveDays,
+            halfDays,
+            totalHours: totalHours.toFixed(1),
+            avgHours,
+            attendanceRate
+          }
+        };
+      });
       
-      const avgHours = presentDays > 0 ? (totalHours / presentDays).toFixed(1) : '0.0';
-      const attendanceRate = workingDays > 0 ? ((presentDays / workingDays) * 100).toFixed(1) : '0.0';
-      
-      return {
-        employee,
-        attendanceRecords,
-        summary: {
-          presentDays,
-          leaveDays,
-          earlyLeaveDays,
-          halfDays,
-          totalHours: totalHours.toFixed(1),
-          avgHours,
-          attendanceRate
-        }
-      };
-    });
-    
-    setMonthlyAttendance(monthlyData);
-    setIsLoading(false);
+      setMonthlyAttendance(monthlyData);
+      console.log('✅ Generated monthly attendance for', monthlyData.length, 'employees');
+    } catch (error) {
+      console.error('Error generating monthly attendance:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const getStatusColor = (status) => {
@@ -707,23 +704,23 @@ Note: You can open this CSV file in Excel for full functionality.`);
                               minHeight: '80px',
                               padding: '0.5rem',
                               position: 'relative',
-                              cursor: dayRecord ? 'pointer' : 'default',
+                              cursor: dayRecord && dayRecord.status !== 'future' && dayRecord.status !== 'weekend' ? 'pointer' : 'default',
                               transition: 'all 0.2s ease',
                               border: isToday ? '2px solid var(--primary-color)' : 'none'
                             }}
                             onMouseEnter={(e) => {
-                              if (dayRecord) {
+                              if (dayRecord && dayRecord.status !== 'future' && dayRecord.status !== 'weekend') {
                                 e.currentTarget.style.background = '#f8fafc';
                                 e.currentTarget.style.transform = 'scale(1.02)';
                               }
                             }}
                             onMouseLeave={(e) => {
-                              if (dayRecord) {
+                              if (dayRecord && dayRecord.status !== 'future' && dayRecord.status !== 'weekend') {
                                 e.currentTarget.style.background = 'white';
                                 e.currentTarget.style.transform = 'scale(1)';
                               }
                             }}
-                            onClick={dayRecord ? () => {
+                            onClick={dayRecord && dayRecord.status !== 'future' && dayRecord.status !== 'weekend' ? () => {
                               // Only show details if there's attendance data for this day
                               alert(`${employeeData.employee.name} - ${format(new Date(selectedYear, selectedMonth, day), 'MMM dd, yyyy')}
 
@@ -746,7 +743,7 @@ Hours: ${dayRecord.hoursWorked || '0'}h`);
                                 }}>
                                   {day}
                                 </span>
-                                {dayRecord && (
+                                {dayRecord && dayRecord.status !== 'future' && (
                                   <span style={{
                                     width: '20px',
                                     height: '20px',
@@ -764,7 +761,7 @@ Hours: ${dayRecord.hoursWorked || '0'}h`);
                                 )}
                               </div>
                               
-                              {dayRecord && dayRecord.status !== 'weekend' && (
+                              {dayRecord && dayRecord.status !== 'weekend' && dayRecord.status !== 'future' && (
                                 <div style={{ fontSize: '0.75rem' }}>
                                   {dayRecord.inTime && dayRecord.outTime ? (
                                     <>
