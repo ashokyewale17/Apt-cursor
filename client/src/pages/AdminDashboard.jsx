@@ -3378,34 +3378,39 @@ const AdminDashboard = () => {
                   maxWidth: '100%',
                   position: 'relative'
                 }}>
-                  <table style={{ 
-                    width: '100%', 
-                    borderCollapse: 'collapse',
-                    minWidth: '800px' // Ensure minimum width for proper layout
-                  }}>
-                    <thead>
-                      <tr style={{ background: 'var(--background-alt)' }}>
-                        <th style={{ 
-                          padding: '1rem', 
-                          textAlign: 'left', 
-                          borderBottom: '2px solid var(--border-color)',
-                          fontWeight: '600',
-                          position: 'sticky',
-                          left: 0,
-                          background: 'var(--background-alt)',
-                          zIndex: 1
-                        }}>
-                          Employee
-                        </th>
-                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Present Days</th>
-                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Leave Days</th>
-                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Total Hours</th>
-                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Avg Hours</th>
-                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Attendance Rate</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {monthlyAttendance.map((employeeData, index) => (
+                  {monthlyAttendance.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      <p>No attendance data available for this month.</p>
+                    </div>
+                  ) : (
+                    <table style={{ 
+                      width: '100%', 
+                      borderCollapse: 'collapse',
+                      minWidth: '800px' // Ensure minimum width for proper layout
+                    }}>
+                      <thead>
+                        <tr style={{ background: 'var(--background-alt)' }}>
+                          <th style={{ 
+                            padding: '1rem', 
+                            textAlign: 'left', 
+                            borderBottom: '2px solid var(--border-color)',
+                            fontWeight: '600',
+                            position: 'sticky',
+                            left: 0,
+                            background: 'var(--background-alt)',
+                            zIndex: 1
+                          }}>
+                            Employee
+                          </th>
+                          <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Present Days</th>
+                          <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Leave Days</th>
+                          <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Total Hours</th>
+                          <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Avg Hours</th>
+                          <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Attendance Rate</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {monthlyAttendance.map((employeeData, index) => (
                         <tr key={employeeData.employee.id} style={{
                           background: index % 2 === 0 ? 'white' : 'var(--background-alt)',
                           transition: 'background 0.2s ease'
@@ -3510,7 +3515,12 @@ const AdminDashboard = () => {
               ) : (
                 /* Calendar View */
                 <div style={{ overflowX: 'auto' }}>
-                  {monthlyAttendance.map((empData) => (
+                  {monthlyAttendance.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      <p>No attendance data available for this month.</p>
+                    </div>
+                  ) : (
+                    monthlyAttendance.map((empData) => (
                     <div key={empData.employee.id} style={{ marginBottom: '2rem' }}>
                       {/* Employee Header */}
                       <div style={{
@@ -3694,7 +3704,8 @@ const AdminDashboard = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    ))}
+                  )}
                 </div>
               )}
             </div>
