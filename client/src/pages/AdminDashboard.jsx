@@ -81,16 +81,31 @@ const AdminDashboard = () => {
 
   // Function to update employee status from database records
   const updateEmployeeStatusFromDatabase = useCallback((attendanceRecords) => {
+    console.log('🔄 Updating employee status from database records...');
+    console.log('📋 Attendance records received:', attendanceRecords.length);
+    
     setRealEmployees(prevEmployees => {
+      if (prevEmployees.length === 0) {
+        console.warn('⚠️ No employees loaded yet, skipping status update');
+        return prevEmployees;
+      }
+      
       // Create a map of employeeId to attendance record for quick lookup
+      // Normalize IDs to strings for comparison
       const attendanceMap = new Map();
       attendanceRecords.forEach(record => {
-        attendanceMap.set(record.employeeId, record);
+        // Store with normalized string ID
+        attendanceMap.set(String(record.employeeId), record);
       });
+      
+      console.log('📊 Attendance map created with', attendanceMap.size, 'records');
+      console.log('📊 Employee IDs in map:', Array.from(attendanceMap.keys()));
+      console.log('📊 Current employees:', prevEmployees.map(e => ({ id: String(e.id), name: e.name })));
       
       // Update each employee based on database records
       const updatedEmployees = prevEmployees.map(emp => {
-        const attendanceRecord = attendanceMap.get(String(emp.id));
+        const empIdString = String(emp.id);
+        const attendanceRecord = attendanceMap.get(empIdString);
         
         if (attendanceRecord) {
           // Employee has checked in today
@@ -108,6 +123,7 @@ const AdminDashboard = () => {
             };
           } else {
             // Employee is currently checked in
+            console.log(`✅ Updated ${emp.name} to active status with check-in time ${checkInFormatted}`);
             return {
               ...emp,
               status: 'active',
@@ -118,17 +134,22 @@ const AdminDashboard = () => {
           }
         } else {
           // Employee hasn't checked in today - mark as absent if they were previously active
+          const newStatus = emp.status === 'active' ? 'absent' : emp.status;
+          if (newStatus === 'absent' && emp.status === 'active') {
+            console.log(`⚠️ ${emp.name} was active but no longer has attendance record - marking as absent`);
+          }
           return {
             ...emp,
-            status: emp.status === 'active' ? 'absent' : emp.status,
+            status: newStatus,
             checkIn: emp.status === 'active' ? '-' : (emp.checkIn || '-'),
             hours: emp.status === 'active' ? '0:00' : (emp.hours || '0:00')
           };
         }
       });
       
-      // Update employee status state
+      // Update employee status state (this is what the UI uses)
       setEmployeeStatus(updatedEmployees);
+      console.log('✅ Employee status updated. Active employees:', updatedEmployees.filter(e => e.status === 'active').length);
       
       // Calculate updated stats
       const activeCount = updatedEmployees.filter(emp => emp.status === 'active' || emp.status === 'completed').length;
@@ -160,14 +181,21 @@ const AdminDashboard = () => {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0'
-        }
+        },
+        cache: 'no-store' // Additional cache prevention
       });
       const data = await response.json();
       
       if (response.ok && data.success && Array.isArray(data.records)) {
         console.log('📊 Fetched', data.records.length, 'attendance records from database');
+        console.log('📊 Records:', data.records.map(r => ({ 
+          id: r.employeeId, 
+          name: r.employeeName, 
+          checkIn: r.checkInTime 
+        })));
         
         // Update employee status based on database records
+        // This will update both realEmployees and employeeStatus
         updateEmployeeStatusFromDatabase(data.records);
         
         // Update recent activity with new check-ins/check-outs
@@ -196,7 +224,7 @@ const AdminDashboard = () => {
           });
         }
       } else {
-        console.error('Failed to fetch attendance records:', data.error);
+        console.error('Failed to fetch attendance records:', data.error || 'Unknown error');
       }
     } catch (error) {
       console.error('Error fetching attendance records:', error);
@@ -283,7 +311,14 @@ const AdminDashboard = () => {
       });
 
       socket.on('employeeCheckIn', (evt) => {
-        console.log('📥 Received check-in event:', evt);
+        console.log('📥 Received check-in event via Socket.io:', evt);
+        console.log('📥 Event details:', {
+          employeeId: evt.employeeId,
+          employeeName: evt.employeeName,
+          department: evt.department,
+          checkInTime: evt.checkInTime
+        });
+        
         // Update recent activity
         setRecentActivity(prev => [
           {
@@ -297,12 +332,22 @@ const AdminDashboard = () => {
           },
           ...prev
         ]);
-        // Refresh data from database to get accurate information
+        
+        // Immediately refresh data from database to get accurate information
+        // This ensures the employee list is updated even if socket event data is incomplete
+        console.log('🔄 Triggering immediate data refresh after check-in event');
         checkForEmployeeCheckIns();
       });
 
       socket.on('employeeCheckOut', (evt) => {
-        console.log('📥 Received check-out event:', evt);
+        console.log('📥 Received check-out event via Socket.io:', evt);
+        console.log('📥 Event details:', {
+          employeeId: evt.employeeId,
+          employeeName: evt.employeeName,
+          department: evt.department,
+          checkOutTime: evt.checkOutTime
+        });
+        
         setRecentActivity(prev => [
           {
             id: Date.now(),
@@ -315,7 +360,9 @@ const AdminDashboard = () => {
           },
           ...prev
         ]);
-        // Refresh data from database to get accurate information
+        
+        // Immediately refresh data from database to get accurate information
+        console.log('🔄 Triggering immediate data refresh after check-out event');
         checkForEmployeeCheckIns();
       });
     } catch (e) {

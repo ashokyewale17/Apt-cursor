@@ -182,25 +182,26 @@ router.post("/checkin", async (req, res) => {
     
     await attendanceRecord.save();
     
-    // Try to populate employee details
-    try {
-      await attendanceRecord.populate('employeeId', 'name department');
-    } catch (populateError) {
-      console.warn('Could not populate employee details:', populateError.message);
-    }
+    // Use employee object directly (already fetched) instead of relying on populate
+    // This ensures we always have the correct employee data for socket emission
+    const employeeName = employee.name || 'Unknown';
+    const employeeDepartment = employee.department || 'Unknown';
     
     // Emit socket event for real-time update with canonical ObjectId
     const io = req.app.get('io');
     if (io) {
       const socketData = {
         employeeId: String(employee._id),
-        employeeName: attendanceRecord.employeeId?.name || 'Unknown',
-        department: attendanceRecord.employeeId?.department || 'Unknown',
+        employeeName: employeeName,
+        department: employeeDepartment,
         checkInTime: attendanceRecord.inTime,
         location: location || 'Office'
       };
       console.log('📡 Broadcasting check-in event to all clients:', socketData);
+      console.log('📡 Socket.io connected clients:', io.sockets.sockets.size);
+      // Emit to all connected clients
       io.emit('employeeCheckIn', socketData);
+      console.log('✅ Check-in event broadcasted successfully');
     } else {
       console.warn('⚠️ Socket.io not available - cannot broadcast check-in event');
     }
@@ -283,25 +284,25 @@ router.post("/checkout", async (req, res) => {
     const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     const hoursWorked = `${diffHours}h ${diffMinutes}m`;
     
-    // Try to populate employee details
-    try {
-      await attendanceRecord.populate('employeeId', 'name department');
-    } catch (populateError) {
-      console.warn('Could not populate employee details:', populateError.message);
-    }
+    // Use employee object directly (already fetched) instead of relying on populate
+    const employeeName = employee.name || 'Unknown';
+    const employeeDepartment = employee.department || 'Unknown';
     
     // Emit socket event for real-time update with canonical ObjectId
     const io = req.app.get('io');
     if (io) {
       const socketData = {
         employeeId: String(employee._id),
-        employeeName: attendanceRecord.employeeId?.name || 'Unknown',
-        department: attendanceRecord.employeeId?.department || 'Unknown',
+        employeeName: employeeName,
+        department: employeeDepartment,
         checkOutTime: attendanceRecord.outTime,
         hoursWorked: hoursWorked
       };
       console.log('📡 Broadcasting check-out event to all clients:', socketData);
+      console.log('📡 Socket.io connected clients:', io.sockets.sockets.size);
+      // Emit to all connected clients
       io.emit('employeeCheckOut', socketData);
+      console.log('✅ Check-out event broadcasted successfully');
     } else {
       console.warn('⚠️ Socket.io not available - cannot broadcast check-out event');
     }
