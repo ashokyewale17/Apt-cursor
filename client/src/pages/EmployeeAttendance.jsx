@@ -136,7 +136,8 @@ const EmployeeAttendance = () => {
             checkOut,
             totalHours,
             breaks: 0, // Breaks not stored in database currently
-            notes
+            notes,
+            attendanceId: record._id || record.id // Store the attendance record ID for edit requests
           };
         }
         
@@ -206,17 +207,28 @@ const EmployeeAttendance = () => {
   };
 
   const loadPendingRequests = async () => {
-    // In a real implementation, this would fetch from the backend
-    // For now, we'll use mock data
-    const mockRequests = [
-      {
-        id: 1,
-        date: new Date(2025, 9, 5),
-        status: 'pending',
-        reason: 'Incorrect check-in time'
+    if (!user || (!user.id && !user._id)) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/attendance-edit/edit-requests/employee', {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : undefined
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Filter to only show pending requests
+        const pending = data.filter(req => req.status === 'pending');
+        setPendingRequests(pending);
+      } else {
+        setPendingRequests([]);
       }
-    ];
-    setPendingRequests(mockRequests);
+    } catch (error) {
+      console.error('Error loading pending requests:', error);
+      setPendingRequests([]);
+    }
   };
 
   const calculateMonthlyStats = (data) => {
@@ -349,19 +361,73 @@ const EmployeeAttendance = () => {
   };
 
   const saveEdit = async () => {
-    // In a real implementation, this would send the data to the backend
-    console.log('Saving edit for day:', editingDay, 'with data:', editData);
-    
-    // Show success notification
-    addNotification({
-      title: 'Attendance Edit Request Submitted',
-      message: 'Your attendance edit request has been submitted for admin approval.',
-      type: 'success'
-    });
-    
-    // For now, we'll just show a success message
-    alert('Edit request submitted successfully! It will be reviewed by admin.');
-    cancelEditing();
+    if (!editingDay) {
+      alert('No day selected for editing');
+      return;
+    }
+
+    // Validate required fields
+    if (!editData.reason || editData.reason.trim() === '') {
+      alert('Please provide a reason for the edit request');
+      return;
+    }
+
+    if (!editingDay.attendanceId) {
+      alert('Attendance record not found. Cannot submit edit request.');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Format the date as ISO string
+      const dateStr = format(editingDay.date, 'yyyy-MM-dd');
+      
+      // Use original times if new times are not provided
+      const inTime = editData.inTime && editData.inTime.trim() !== '' 
+        ? editData.inTime.trim() 
+        : (editingDay.checkIn ? format(editingDay.checkIn, 'HH:mm') : null);
+      const outTime = editData.outTime && editData.outTime.trim() !== '' 
+        ? editData.outTime.trim() 
+        : (editingDay.checkOut ? format(editingDay.checkOut, 'HH:mm') : null);
+      
+      const response = await fetch('/api/attendance-edit/edit-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : undefined
+        },
+        body: JSON.stringify({
+          attendanceId: editingDay.attendanceId,
+          date: dateStr,
+          inTime: inTime,
+          outTime: outTime,
+          reason: editData.reason.trim()
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Show success notification
+        addNotification({
+          title: 'Attendance Edit Request Submitted',
+          message: 'Your attendance edit request has been submitted for admin approval.',
+          type: 'success'
+        });
+        
+        alert('Edit request submitted successfully! It will be reviewed by admin.');
+        cancelEditing();
+        
+        // Reload pending requests to show the new one
+        loadPendingRequests();
+      } else {
+        alert(data.message || 'Failed to submit edit request. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error submitting edit request:', error);
+      alert('Failed to submit edit request. Please try again.');
+    }
   };
 
   const isDayEditable = (day) => {
