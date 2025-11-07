@@ -127,7 +127,8 @@ const AdminDashboard = () => {
       socket.emit('join', 'admin');
 
       socket.on('employeeCheckIn', (evt) => {
-        // Update recent activity and mark employee status to active
+        console.log('📥 Received check-in event:', evt);
+        // Update recent activity
         setRecentActivity(prev => [
           {
             id: Date.now(),
@@ -140,15 +141,12 @@ const AdminDashboard = () => {
           },
           ...prev
         ]);
-        setRealEmployees(prev => prev.map(e => 
-          String(e.id) === String(evt.employeeId) ? { ...e, status: 'active' } : e
-        ));
-        setEmployeeStatus(prev => prev.map(e => 
-          String(e.id) === String(evt.employeeId) ? { ...e, status: 'active' } : e
-        ));
+        // Refresh data from database to get accurate information
+        checkForEmployeeCheckIns();
       });
 
       socket.on('employeeCheckOut', (evt) => {
+        console.log('📥 Received check-out event:', evt);
         setRecentActivity(prev => [
           {
             id: Date.now(),
@@ -161,8 +159,8 @@ const AdminDashboard = () => {
           },
           ...prev
         ]);
-        // Optionally mark as inactive or leave current status; here we keep as active
-        // but you can flip to 'inactive' if your UI expects that.
+        // Refresh data from database to get accurate information
+        checkForEmployeeCheckIns();
       });
     } catch (e) {
       console.warn('Socket initialization failed:', e.message);
@@ -363,6 +361,12 @@ const AdminDashboard = () => {
     } catch (error) {
       console.log('Failed to save employee data to localStorage:', error);
     }
+
+    // Fetch today's attendance from database to update employee status
+    // This will override any localStorage-based status
+    setTimeout(() => {
+      checkForEmployeeCheckIns();
+    }, 500);
 
     // Update stats based on real data
     const activeCount = employees.filter(emp => emp.status === 'active' || emp.status === 'completed').length;
@@ -691,188 +695,125 @@ const AdminDashboard = () => {
     }
   };
 
-  // Real-time check for employee check-ins (optimized to prevent spam)
-  const checkForEmployeeCheckIns = () => {
-    // Check for admin notifications from employees
-    const keys = Object.keys(localStorage);
-    const adminNotificationKeys = keys.filter(key => key.startsWith('adminNotification_'));
-    
-    // Process all notifications
-    if (adminNotificationKeys.length > 0) {
-      const newActivities = [];
-      let hasValidNotifications = false;
+  // Function to update employee status from database records
+  const updateEmployeeStatusFromDatabase = (attendanceRecords) => {
+    setRealEmployees(prevEmployees => {
+      // Create a map of employeeId to attendance record for quick lookup
+      const attendanceMap = new Map();
+      attendanceRecords.forEach(record => {
+        attendanceMap.set(record.employeeId, record);
+      });
       
-      adminNotificationKeys.forEach(key => {
-        const notificationData = localStorage.getItem(key);
-        if (notificationData) {
-          try {
-            const notification = JSON.parse(notificationData);
-            const notificationTime = new Date(notification.timestamp);
-            
-            // Process notifications from the last 5 minutes to avoid missing any
-            if (Date.now() - notificationTime.getTime() < 300000) { // 5 minutes
-              console.log('Processing notification:', notification);
-              
-              if (notification.type === 'employee_checkin') {
-                newActivities.push({
-                  id: Date.now() + Math.random(),
-                  type: 'check-in',
-                  employee: notification.employeeName,
-                  department: notification.department,
-                  time: new Date(notification.checkInTime),
-                  status: 'success',
-                  avatar: notification.employeeName.split(' ').map(n => n[0]).join('')
-                });
-                
-                // Also add a notification to the UI
-                const notificationMsg = {
-                  title: 'Employee Check-in',
-                  message: `${notification.employeeName} has checked in at ${format(new Date(notification.checkInTime), 'HH:mm')}`,
-                  type: 'success',
-                  timestamp: new Date().toISOString()
-                };
-                
-                // In a real app, we would use the addNotification function from useAuth
-                // For now, we'll just log it
-                console.log('New notification:', notificationMsg);
-                
-                hasValidNotifications = true;
-              } else if (notification.type === 'employee_checkout') {
-                newActivities.push({
-                  id: Date.now() + Math.random(),
-                  type: 'check-out',
-                  employee: notification.employeeName,
-                  department: notification.department,
-                  time: new Date(notification.checkOutTime),
-                  status: 'success',
-                  avatar: notification.employeeName.split(' ').map(n => n[0]).join('')
-                });
-                
-                // Also add a notification to the UI
-                const notificationMsg = {
-                  title: 'Employee Check-out',
-                  message: `${notification.employeeName} has checked out`,
-                  type: 'info',
-                  timestamp: new Date().toISOString()
-                };
-                
-                // In a real app, we would use the addNotification function from useAuth
-                // For now, we'll just log it
-                console.log('New notification:', notificationMsg);
-                
-                hasValidNotifications = true;
-              }
-            }
-            
-            // Always remove the notification after processing (or if it's too old)
-            localStorage.removeItem(key);
-          } catch (error) {
-            console.error('Error processing notification:', error);
-            localStorage.removeItem(key);
+      // Update each employee based on database records
+      const updatedEmployees = prevEmployees.map(emp => {
+        const attendanceRecord = attendanceMap.get(String(emp.id));
+        
+        if (attendanceRecord) {
+          // Employee has checked in today
+          const checkInTime = new Date(attendanceRecord.checkInTime);
+          const checkInFormatted = format(checkInTime, 'HH:mm');
+          
+          if (attendanceRecord.checkOutTime) {
+            // Employee has checked out
+            return {
+              ...emp,
+              status: 'completed',
+              checkIn: checkInFormatted,
+              location: attendanceRecord.location || 'Office',
+              hours: attendanceRecord.hoursWorked
+            };
+          } else {
+            // Employee is currently checked in
+            return {
+              ...emp,
+              status: 'active',
+              checkIn: checkInFormatted,
+              location: attendanceRecord.location || 'Office',
+              hours: '0:00'
+            };
           }
+        } else {
+          // Employee hasn't checked in today - mark as absent if they were previously active
+          return {
+            ...emp,
+            status: emp.status === 'active' ? 'absent' : emp.status,
+            checkIn: emp.status === 'active' ? '-' : (emp.checkIn || '-'),
+            hours: emp.status === 'active' ? '0:00' : (emp.hours || '0:00')
+          };
         }
       });
       
-      // Only update state if we have valid new notifications
-      if (hasValidNotifications) {
-        console.log('📊 Processing', newActivities.length, 'new employee activities');
+      // Update employee status state
+      setEmployeeStatus(updatedEmployees);
+      
+      // Calculate updated stats
+      const activeCount = updatedEmployees.filter(emp => emp.status === 'active' || emp.status === 'completed').length;
+      const leaveCount = updatedEmployees.filter(emp => emp.status === 'leave').length;
+      const absentCount = updatedEmployees.filter(emp => emp.status === 'absent').length;
+      
+      setStats(prev => ({
+        ...prev,
+        totalEmployees: updatedEmployees.length,
+        activeToday: activeCount,
+        onLeave: leaveCount,
+        absentToday: absentCount,
+        attendanceRate: updatedEmployees.length > 0 ? ((activeCount / updatedEmployees.length) * 100).toFixed(1) : '0'
+      }));
+      
+      return updatedEmployees;
+    });
+  };
+
+  // Real-time check for employee check-ins (optimized to prevent spam)
+  const checkForEmployeeCheckIns = async () => {
+    try {
+      // Fetch today's attendance records from database
+      const response = await fetch('/api/attendance-records/today/all');
+      const data = await response.json();
+      
+      if (response.ok && data.success && Array.isArray(data.records)) {
+        console.log('📊 Fetched', data.records.length, 'attendance records from database');
         
-        // Update recent activity
+        // Update employee status based on database records
+        updateEmployeeStatusFromDatabase(data.records);
+        
+        // Update recent activity with new check-ins/check-outs
+        const newActivities = data.records
+          .filter(record => {
+            // Only show records from the last hour to avoid cluttering
+            const recordTime = new Date(record.checkInTime);
+            return Date.now() - recordTime.getTime() < 3600000; // 1 hour
+          })
+          .map(record => ({
+            id: `${record.employeeId}_${record.checkInTime}`,
+            type: record.checkOutTime ? 'check-out' : 'check-in',
+            employee: record.employeeName,
+            department: record.department,
+            time: new Date(record.checkOutTime || record.checkInTime),
+            status: 'success',
+            avatar: record.employeeName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+          }));
+        
         if (newActivities.length > 0) {
-          setRecentActivity(prev => [...newActivities, ...prev].slice(0, 15));
+          setRecentActivity(prev => {
+            // Merge with existing activities, avoiding duplicates
+            const existingIds = new Set(prev.map(a => a.id));
+            const uniqueNew = newActivities.filter(a => !existingIds.has(a.id));
+            return [...uniqueNew, ...prev].slice(0, 15);
+          });
         }
-        
-        // Update stats and employee status
-        updateEmployeeStats();
+      } else {
+        console.error('Failed to fetch attendance records:', data.error);
       }
+    } catch (error) {
+      console.error('Error fetching attendance records:', error);
     }
   };
   
-  // Separate function to update stats and employee status without full reload
+  // Separate function to update stats and employee status without full reload (kept for backward compatibility)
   const updateEmployeeStats = () => {
-    const savedEmployees = localStorage.getItem('realEmployees');
-    if (savedEmployees) {
-      try {
-        let employees = JSON.parse(savedEmployees);
-        
-        // Update employee status based on today's check-ins
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const updatedEmployees = employees.map(emp => {
-          const checkInKey = `checkIn_${emp.id}_${today}`;
-          const checkInData = localStorage.getItem(checkInKey);
-          
-          if (checkInData) {
-            try {
-              const data = JSON.parse(checkInData);
-              if (data.checkedIn) {
-                return {
-                  ...emp,
-                  status: 'active',
-                  checkIn: format(new Date(data.checkInTime), 'HH:mm'),
-                  location: data.location || 'Office', // Use location from check-in data or default to Office
-                  hours: '0:00' // Reset hours when checking in
-                };
-              } else if (data.checkOutTime) {
-                // Calculate hours worked
-                const checkInTime = new Date(data.checkInTime);
-                const checkOutTime = new Date(data.checkOutTime);
-                const diffMs = checkOutTime - checkInTime;
-                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                const hoursWorked = `${diffHours}:${diffMinutes.toString().padStart(2, '0')}`;
-                
-                return {
-                  ...emp,
-                  status: 'completed',
-                  checkIn: format(new Date(data.checkInTime), 'HH:mm'),
-                  location: data.location || 'Office', // Use location from check-in data or default to Office
-                  hours: hoursWorked
-                };
-              }
-            } catch (error) {
-              console.error('Error parsing check-in data for employee', emp.id, ':', error);
-            }
-          }
-          
-          // If no check-in data, keep original status but mark as not checked in today
-          return {
-            ...emp,
-            status: emp.status === 'active' ? 'absent' : emp.status, // Mark previously active employees as absent if no check-in
-            checkIn: emp.status === 'active' ? '-' : emp.checkIn
-          };
-        });
-        
-        // Update employee arrays
-        setRealEmployees(updatedEmployees);
-        setEmployeeStatus(updatedEmployees);
-        
-        // Save updated employee data back to localStorage
-        localStorage.setItem('realEmployees', JSON.stringify(updatedEmployees));
-        
-        // Calculate updated stats
-        const activeCount = updatedEmployees.filter(emp => emp.status === 'active' || emp.status === 'completed').length;
-        const leaveCount = updatedEmployees.filter(emp => emp.status === 'leave').length;
-        const absentCount = updatedEmployees.filter(emp => emp.status === 'absent').length;
-        
-        setStats(prev => ({
-          ...prev,
-          totalEmployees: updatedEmployees.length,
-          activeToday: activeCount,
-          onLeave: leaveCount,
-          absentToday: absentCount,
-          attendanceRate: ((activeCount / updatedEmployees.length) * 100).toFixed(1)
-        }));
-        
-        console.log('📊 Updated employee status:', {
-          active: activeCount,
-          leave: leaveCount,
-          absent: absentCount
-        });
-        
-      } catch (error) {
-        console.error('Error updating employee stats:', error);
-      }
-    }
+    // This function now just triggers a database fetch
+    checkForEmployeeCheckIns();
   };
 
 
