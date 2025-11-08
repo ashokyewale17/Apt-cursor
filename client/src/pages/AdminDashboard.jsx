@@ -152,18 +152,21 @@ const AdminDashboard = () => {
       setEmployeeStatus(updatedEmployees);
       console.log('✅ Employee status updated. Active employees:', updatedEmployees.filter(e => e.status === 'active').length);
       
-      // Calculate updated stats
-      const activeCount = updatedEmployees.filter(emp => emp.status === 'active' || emp.status === 'completed').length;
-      const leaveCount = updatedEmployees.filter(emp => emp.status === 'leave').length;
-      const absentCount = updatedEmployees.filter(emp => emp.status === 'absent').length;
+      // Filter out admins for stats
+      const nonAdminEmployees = updatedEmployees.filter(emp => emp.role !== 'admin');
+      
+      // Calculate updated stats (excluding admins)
+      const activeCount = nonAdminEmployees.filter(emp => emp.status === 'active' || emp.status === 'completed').length;
+      const leaveCount = nonAdminEmployees.filter(emp => emp.status === 'leave').length;
+      const absentCount = nonAdminEmployees.filter(emp => emp.status === 'absent').length;
       
       setStats(prev => ({
         ...prev,
-        totalEmployees: updatedEmployees.length,
+        totalEmployees: nonAdminEmployees.length,
         activeToday: activeCount,
         onLeave: leaveCount,
         absentToday: absentCount,
-        attendanceRate: updatedEmployees.length > 0 ? ((activeCount / updatedEmployees.length) * 100).toFixed(1) : '0'
+        attendanceRate: nonAdminEmployees.length > 0 ? ((activeCount / nonAdminEmployees.length) * 100).toFixed(1) : '0'
       }));
       
       return updatedEmployees;
@@ -635,7 +638,9 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     if (realEmployees.length > 0) {
-      generateMonthlyAttendance(realEmployees);
+      // Filter out admins before generating attendance
+      const nonAdminEmployees = realEmployees.filter(emp => emp.role !== 'admin');
+      generateMonthlyAttendance(nonAdminEmployees);
     }
   }, [realEmployees, selectedMonth, selectedYear]);
 
@@ -776,20 +781,25 @@ const AdminDashboard = () => {
       checkForEmployeeCheckIns();
     }, 500);
 
-    // Update stats based on real data
-    const activeCount = employees.filter(emp => emp.status === 'active' || emp.status === 'completed').length;
-    const leaveCount = employees.filter(emp => emp.status === 'leave').length;
-    const absentCount = employees.filter(emp => emp.status === 'absent').length;
-    const avgProductivity = employees.reduce((sum, emp) => sum + emp.productivity, 0) / employees.length;
+    // Filter out admins for stats
+    const nonAdminEmployees = employees.filter(emp => emp.role !== 'admin');
+    
+    // Update stats based on real data (excluding admins)
+    const activeCount = nonAdminEmployees.filter(emp => emp.status === 'active' || emp.status === 'completed').length;
+    const leaveCount = nonAdminEmployees.filter(emp => emp.status === 'leave').length;
+    const absentCount = nonAdminEmployees.filter(emp => emp.status === 'absent').length;
+    const avgProductivity = nonAdminEmployees.length > 0 
+      ? nonAdminEmployees.reduce((sum, emp) => sum + emp.productivity, 0) / nonAdminEmployees.length 
+      : 0;
     
     setStats(prev => ({
       ...prev,
-      totalEmployees: employees.length,
+      totalEmployees: nonAdminEmployees.length,
       activeToday: activeCount,
       onLeave: leaveCount,
       absentToday: absentCount,
       productivity: avgProductivity.toFixed(1),
-      attendanceRate: ((activeCount / employees.length) * 100).toFixed(1)
+      attendanceRate: nonAdminEmployees.length > 0 ? ((activeCount / nonAdminEmployees.length) * 100).toFixed(1) : '0'
     }));
 
     // Real activity data based on employees
@@ -946,7 +956,9 @@ const AdminDashboard = () => {
   };
 
   const generateMonthlyAttendance = (employees) => {
-    const monthlyData = employees.map(employee => {
+    // Filter out admins before generating attendance
+    const nonAdminEmployees = employees.filter(emp => emp.role !== 'admin');
+    const monthlyData = nonAdminEmployees.map(employee => {
       const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
       const attendanceRecords = [];
       let presentDays = 0;
@@ -1038,8 +1050,9 @@ const AdminDashboard = () => {
   const handleMonthChange = (month, year) => {
     setSelectedMonth(month);
     setSelectedYear(year);
-    // Regenerate attendance data for new month
-    generateMonthlyAttendance(realEmployees);
+    // Regenerate attendance data for new month (excluding admins)
+    const nonAdminEmployees = realEmployees.filter(emp => emp.role !== 'admin');
+    generateMonthlyAttendance(nonAdminEmployees);
   };
 
   const getStatusBadge = (status) => {
@@ -1140,7 +1153,12 @@ const AdminDashboard = () => {
     return `${hours}h ${minutes}m`;
   };
 
-  const filteredEmployees = employeeStatus.filter(emp => {
+  // Helper function to filter out admins
+  const filterNonAdmins = (employees) => {
+    return employees.filter(emp => emp.role !== 'admin');
+  };
+
+  const filteredEmployees = filterNonAdmins(employeeStatus).filter(emp => {
     const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          emp.department.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDepartment = departmentFilter === 'all' || emp.department === departmentFilter;
@@ -1322,15 +1340,17 @@ const AdminDashboard = () => {
   };
 
   const handleStatusCardClick = (statusType) => {
+    // Filter out admins first
+    const nonAdminEmployees = realEmployees.filter(emp => emp.role !== 'admin');
     let filteredEmployees = [];
     
     switch (statusType) {
       case 'active':
-        filteredEmployees = realEmployees.filter(emp => emp.status === 'active');
+        filteredEmployees = nonAdminEmployees.filter(emp => emp.status === 'active');
         break;
       case 'absent':
         // Modified to show employees who have taken leave on prior days or applied for leave before current day
-        filteredEmployees = realEmployees.filter(emp => {
+        filteredEmployees = nonAdminEmployees.filter(emp => {
           // First check if they're absent today
           if (emp.status === 'absent') return true;
           
@@ -1366,7 +1386,7 @@ const AdminDashboard = () => {
         });
         break;
       case 'late':
-        filteredEmployees = realEmployees.filter(emp => emp.status === 'late');
+        filteredEmployees = nonAdminEmployees.filter(emp => emp.status === 'late');
         break;
       default:
         filteredEmployees = [];
@@ -1555,7 +1575,7 @@ const AdminDashboard = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div className="stat-value" style={{ color: 'var(--danger-color)' }}>
-                {realEmployees.filter(emp => {
+                {realEmployees.filter(emp => emp.role !== 'admin').filter(emp => {
                   // Show count of employees who are absent today or have approved/pending leave for today
                   if (emp.status === 'absent') return true;
                   
@@ -1604,8 +1624,8 @@ const AdminDashboard = () => {
         
         <div className="stat-card" style={{ borderLeft: '4px solid var(--info-color, #3b82f6)', cursor: 'pointer', transition: 'all 0.2s ease' }}
              onClick={() => {
-               // Show comp off employees instead of analytics modal
-               const compOffEmployees = realEmployees.filter(emp => {
+               // Show comp off employees instead of analytics modal (excluding admins)
+               const compOffEmployees = realEmployees.filter(emp => emp.role !== 'admin').filter(emp => {
                  const weekendWorkers = [1, 3, 5]; // Employee IDs who worked weekends
                  return weekendWorkers.includes(emp.id);
                });
@@ -1624,8 +1644,8 @@ const AdminDashboard = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div className="stat-value" style={{ color: 'var(--info-color, #3b82f6)' }}>
-                {/* Calculate comp off days based on employees who worked on weekends/holidays */}
-                {realEmployees.filter(emp => {
+                {/* Calculate comp off days based on employees who worked on weekends/holidays (excluding admins) */}
+                {realEmployees.filter(emp => emp.role !== 'admin').filter(emp => {
                   // In a real implementation, this would check actual attendance records
                   // For demo purposes, we'll simulate with a random selection
                   const weekendWorkers = [1, 3, 5]; // Employee IDs who worked weekends
@@ -2112,8 +2132,8 @@ const AdminDashboard = () => {
           </div>
           <div className="card-body" style={{ padding: 0 }}>
             <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-              {/* Show comp off days information in activity feed */}
-              {realEmployees.filter(emp => {
+              {/* Show comp off days information in activity feed (excluding admins) */}
+              {realEmployees.filter(emp => emp.role !== 'admin').filter(emp => {
                 // In a real implementation, this would check actual attendance records
                 // For demo purposes, we'll simulate with a random selection
                 const weekendWorkers = [1, 3, 5]; // Employee IDs who worked weekends
@@ -2130,7 +2150,7 @@ const AdminDashboard = () => {
                   padding: '1rem'
                 }}>
                   <div>
-                    <strong>{realEmployees.filter(emp => {
+                    <strong>{realEmployees.filter(emp => emp.role !== 'admin').filter(emp => {
                       // In a real implementation, this would check actual attendance records
                       // For demo purposes, we'll simulate with a random selection
                       const weekendWorkers = [1, 3, 5]; // Employee IDs who worked weekends
@@ -2142,7 +2162,7 @@ const AdminDashboard = () => {
                   </div>
                   <button 
                     onClick={() => {
-                      const compOffEmployees = realEmployees.filter(emp => {
+                      const compOffEmployees = realEmployees.filter(emp => emp.role !== 'admin').filter(emp => {
                         const weekendWorkers = [1, 3, 5]; // Employee IDs who worked weekends
                         return weekendWorkers.includes(emp.id);
                       });
