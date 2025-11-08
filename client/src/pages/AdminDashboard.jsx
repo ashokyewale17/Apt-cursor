@@ -235,6 +235,13 @@ const AdminDashboard = () => {
     }
   }, [updateEmployeeStatusFromDatabase]);
 
+  // Helper function to check if an employee is an admin (case-insensitive)
+  const isAdmin = (employee) => {
+    if (!employee || !employee.role) return false;
+    const role = employee.role.toLowerCase().trim();
+    return role === 'admin' || role.includes('admin');
+  };
+
   // Load weekly attendance data for all employees (excluding admins)
   const loadWeeklyAttendanceData = useCallback(async () => {
     if (realEmployees.length === 0) return;
@@ -245,7 +252,7 @@ const AdminDashboard = () => {
       const year = today.getFullYear();
       
       // Filter out admins - admins don't check in/out
-      const nonAdminEmployees = realEmployees.filter(emp => emp.role !== 'admin');
+      const nonAdminEmployees = realEmployees.filter(emp => !isAdmin(emp));
       
       // Fetch attendance data for non-admin employees in parallel
       const attendancePromises = nonAdminEmployees.map(async (employee) => {
@@ -646,7 +653,12 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (realEmployees.length > 0) {
       // Filter out admins before generating attendance
-      const nonAdminEmployees = realEmployees.filter(emp => emp.role !== 'admin');
+      const nonAdminEmployees = realEmployees.filter(emp => !isAdmin(emp));
+      const adminCount = realEmployees.length - nonAdminEmployees.length;
+      if (adminCount > 0) {
+        console.log('🚫 Filtered out', adminCount, 'admin(s) from monthly attendance generation');
+      }
+      console.log('📊 Generating monthly attendance for', nonAdminEmployees.length, 'non-admin employees (filtered from', realEmployees.length, 'total)');
       generateMonthlyAttendance(nonAdminEmployees);
     }
   }, [realEmployees, selectedMonth, selectedYear]);
@@ -963,8 +975,15 @@ const AdminDashboard = () => {
   };
 
   const generateMonthlyAttendance = (employees) => {
-    // Filter out admins before generating attendance
-    const nonAdminEmployees = employees.filter(emp => emp.role !== 'admin');
+    // Filter out admins before generating attendance (case-insensitive check)
+    const nonAdminEmployees = employees.filter(emp => !isAdmin(emp));
+    
+    // Debug: Log filtered results
+    if (employees.length !== nonAdminEmployees.length) {
+      const admins = employees.filter(emp => isAdmin(emp));
+      console.log('🚫 Filtered out', admins.length, 'admin(s) from monthly attendance:', admins.map(a => ({ name: a.name, role: a.role })));
+    }
+    
     const monthlyData = nonAdminEmployees.map(employee => {
       const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
       const attendanceRecords = [];
@@ -1058,7 +1077,7 @@ const AdminDashboard = () => {
     setSelectedMonth(month);
     setSelectedYear(year);
     // Regenerate attendance data for new month (excluding admins)
-    const nonAdminEmployees = realEmployees.filter(emp => emp.role !== 'admin');
+    const nonAdminEmployees = realEmployees.filter(emp => !isAdmin(emp));
     generateMonthlyAttendance(nonAdminEmployees);
   };
 
@@ -3441,7 +3460,10 @@ const AdminDashboard = () => {
                   textAlign: 'center'
                 }}>
                   <div style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.5rem' }}>
-                    {monthlyAttendance.reduce((sum, emp) => sum + emp.summary.presentDays, 0)}
+                    {(() => {
+                      const nonAdminAttendance = monthlyAttendance.filter(emp => !isAdmin(emp.employee));
+                      return nonAdminAttendance.reduce((sum, emp) => sum + emp.summary.presentDays, 0);
+                    })()}
                   </div>
                   <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Total Present Days</div>
                 </div>
@@ -3453,7 +3475,10 @@ const AdminDashboard = () => {
                   textAlign: 'center'
                 }}>
                   <div style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.5rem' }}>
-                    {monthlyAttendance.reduce((sum, emp) => sum + emp.summary.leaveDays, 0)}
+                    {(() => {
+                      const nonAdminAttendance = monthlyAttendance.filter(emp => !isAdmin(emp.employee));
+                      return nonAdminAttendance.reduce((sum, emp) => sum + emp.summary.leaveDays, 0);
+                    })()}
                   </div>
                   <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Total Leave Days</div>
                 </div>
@@ -3465,7 +3490,10 @@ const AdminDashboard = () => {
                   textAlign: 'center'
                 }}>
                   <div style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.5rem' }}>
-                    {convertDecimalToHoursMinutes(parseFloat(monthlyAttendance.reduce((sum, emp) => sum + parseFloat(emp.summary.totalHours), 0).toFixed(0)))}
+                    {(() => {
+                      const nonAdminAttendance = monthlyAttendance.filter(emp => !isAdmin(emp.employee));
+                      return convertDecimalToHoursMinutes(parseFloat(nonAdminAttendance.reduce((sum, emp) => sum + parseFloat(emp.summary.totalHours), 0).toFixed(0)));
+                    })()}
                   </div>
                   <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Total Hours Worked</div>
                 </div>
@@ -3477,9 +3505,12 @@ const AdminDashboard = () => {
                   textAlign: 'center'
                 }}>
                   <div style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.5rem' }}>
-                    {convertDecimalToHoursMinutes(monthlyAttendance.length > 0 ? 
-                      (monthlyAttendance.reduce((sum, emp) => sum + parseFloat(emp.summary.avgHours), 0) / monthlyAttendance.length)
-                      : 0)}
+                    {(() => {
+                      const nonAdminAttendance = monthlyAttendance.filter(emp => !isAdmin(emp.employee));
+                      return convertDecimalToHoursMinutes(nonAdminAttendance.length > 0 ? 
+                        (nonAdminAttendance.reduce((sum, emp) => sum + parseFloat(emp.summary.avgHours), 0) / nonAdminAttendance.length)
+                        : 0);
+                    })()}
                   </div>
                   <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Avg Hours/Day</div>
                 </div>
@@ -3520,7 +3551,7 @@ const AdminDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {monthlyAttendance.map((employeeData, index) => (
+                      {monthlyAttendance.filter(empData => !isAdmin(empData.employee)).map((employeeData, index) => (
                         <tr key={employeeData.employee.id} style={{
                           background: index % 2 === 0 ? 'white' : 'var(--background-alt)',
                           transition: 'background 0.2s ease'
@@ -3625,7 +3656,7 @@ const AdminDashboard = () => {
               ) : (
                 /* Calendar View */
                 <div style={{ overflowX: 'auto' }}>
-                  {monthlyAttendance.map((empData) => (
+                  {monthlyAttendance.filter(empData => !isAdmin(empData.employee)).map((empData) => (
                     <div key={empData.employee.id} style={{ marginBottom: '2rem' }}>
                       {/* Employee Header */}
                       <div style={{
