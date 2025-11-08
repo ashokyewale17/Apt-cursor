@@ -235,7 +235,7 @@ const AdminDashboard = () => {
     }
   }, [updateEmployeeStatusFromDatabase]);
 
-  // Load weekly attendance data for all employees
+  // Load weekly attendance data for all employees (excluding admins)
   const loadWeeklyAttendanceData = useCallback(async () => {
     if (realEmployees.length === 0) return;
     
@@ -244,8 +244,11 @@ const AdminDashboard = () => {
       const month = today.getMonth() + 1;
       const year = today.getFullYear();
       
-      // Fetch attendance data for all employees in parallel
-      const attendancePromises = realEmployees.map(async (employee) => {
+      // Filter out admins - admins don't check in/out
+      const nonAdminEmployees = realEmployees.filter(emp => emp.role !== 'admin');
+      
+      // Fetch attendance data for non-admin employees in parallel
+      const attendancePromises = nonAdminEmployees.map(async (employee) => {
         try {
           const response = await fetch(`/api/attendance-records/employee/${employee.id}/${month}/${year}`);
           const records = response.ok ? await response.json() : [];
@@ -338,7 +341,7 @@ const AdminDashboard = () => {
       });
       
       setWeeklyAttendanceData(dataMap);
-      console.log('✅ Loaded weekly attendance data for', results.length, 'employees');
+      console.log('✅ Loaded weekly attendance data for', results.length, 'non-admin employees');
     } catch (error) {
       console.error('Error loading weekly attendance data:', error);
     }
@@ -541,12 +544,16 @@ const AdminDashboard = () => {
     }
   }, [showEmployeeModal]);
 
-  // Load weekly attendance data when employees are loaded
+  // Load weekly attendance data when employees are loaded (excluding admins)
   useEffect(() => {
     if (realEmployees.length > 0) {
-      loadWeeklyAttendanceData();
+      // Filter out admins before loading attendance data
+      const nonAdminEmployees = realEmployees.filter(emp => emp.role !== 'admin');
+      if (nonAdminEmployees.length > 0) {
+        loadWeeklyAttendanceData();
+      }
       
-      // Also update the chart data (aggregated view)
+      // Also update the chart data (aggregated view - excluding admins)
       const updateChartData = () => {
         const last7Days = Array.from({ length: 7 }, (_, i) => {
           const date = subDays(new Date(), 6 - i);
@@ -561,7 +568,7 @@ const AdminDashboard = () => {
             };
           }
           
-          // Count present/absent from weeklyAttendanceData
+          // Count present/absent from weeklyAttendanceData (already excludes admins)
           let present = 0;
           let absent = 0;
           
@@ -1841,14 +1848,14 @@ const AdminDashboard = () => {
           </div>
           <div className="card-body">
 
-            {/* Real-Time Employee Weekly Attendance Grid */}
+            {/* Real-Time Employee Weekly Attendance Grid (excluding admins) */}
             <div style={{ 
               display: 'grid', 
               gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
               gap: '1.5rem', 
               marginBottom: '1rem'
             }}>
-              {realEmployees.map((employee) => {
+              {realEmployees.filter(emp => emp.role !== 'admin').map((employee) => {
                 // Get real weekly attendance data from database
                 const weeklyData = weeklyAttendanceData.get(employee.id) || Array.from({ length: 7 }, (_, i) => {
                   // Fallback: generate empty data if not loaded yet
