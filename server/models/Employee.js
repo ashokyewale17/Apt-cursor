@@ -3,13 +3,6 @@ const validator = require('validator');
 const bcrypt = require('bcryptjs');
 
 const employeeSchema = new mongoose.Schema({
-  employeeId: {
-    type: String,
-    unique: true,
-    trim: true,
-    uppercase: true,
-    match: [/^EMP\d+$/, 'Employee ID must be in format EMP001, EMP002, etc.']
-  },
   name: {
     type: String,
     required: [true, 'Name is required'],
@@ -84,44 +77,6 @@ const employeeSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Generate sequential employee ID before saving
-employeeSchema.pre('save', async function(next) {
-  // Only generate employeeId if it doesn't exist and this is a new document
-  if (!this.employeeId && this.isNew) {
-    try {
-      // Find all employees with employeeId to get the highest number
-      const employees = await this.constructor
-        .find({ employeeId: { $exists: true, $ne: null, $regex: /^EMP\d+$/ } })
-        .select('employeeId')
-        .lean();
-      
-      let nextNumber = 1;
-      
-      if (employees.length > 0) {
-        // Extract numbers from all employee IDs and find the maximum
-        const numbers = employees
-          .map(emp => {
-            const match = emp.employeeId.match(/^EMP(\d+)$/);
-            return match ? parseInt(match[1], 10) : 0;
-          })
-          .filter(num => num > 0);
-        
-        if (numbers.length > 0) {
-          nextNumber = Math.max(...numbers) + 1;
-        }
-      }
-      
-      // Format as EMP001, EMP002, etc. (3 digits minimum)
-      this.employeeId = `EMP${nextNumber.toString().padStart(3, '0')}`;
-    } catch (error) {
-      console.error('Error generating employee ID:', error);
-      return next(error);
-    }
-  }
-  
-  next();
-});
-
 // Hash password before saving
 employeeSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
@@ -141,7 +96,6 @@ employeeSchema.methods.comparePassword = async function(candidatePassword) {
 };
 
 // Create index for faster searches
-employeeSchema.index({ employeeId: 1 });
 employeeSchema.index({ name: 1, email: 1 });
 employeeSchema.index({ department: 1 });
 employeeSchema.index({ role: 1 });

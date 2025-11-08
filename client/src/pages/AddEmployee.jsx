@@ -285,26 +285,25 @@ const AddEmployee = () => {
                 
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                    Employee ID
+                    Employee ID *
                   </label>
                   <input
                     type="text"
-                    value="Auto-generated (EMP001, EMP002, etc.)"
-                    disabled
+                    name="employeeId"
+                    value={formData.employeeId}
+                    onChange={handleChange}
+                    required
                     style={{
                       width: '100%',
                       padding: '0.75rem',
                       border: '1px solid var(--border-color)',
                       borderRadius: '0.5rem',
                       fontSize: '0.875rem',
-                      background: '#f3f4f6',
-                      color: '#6b7280',
-                      cursor: 'not-allowed'
+                      background: '#ffffff',
+                      color: '#1f2937'
                     }}
+                    placeholder="EMP001"
                   />
-                  <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#6b7280' }}>
-                    Employee ID will be automatically generated in sequential format (EMP001, EMP002, etc.)
-                  </p>
                 </div>
 
                 <div style={{ marginBottom: '1rem' }}>
