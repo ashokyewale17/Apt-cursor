@@ -85,6 +85,7 @@ const Login = () => {
       const userData = {
         _id: apiUser._id,
         id: apiUser._id, // compatibility for parts using user.id
+        employeeId: apiUser.employeeId,
         name: apiUser.name,
         email: apiUser.email,
         role: apiUser.role,

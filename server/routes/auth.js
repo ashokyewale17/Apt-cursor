@@ -55,6 +55,7 @@ router.post('/login', async (req, res) => {
     // Remove password from response
     const userResponse = {
       _id: user._id,
+      employeeId: user.employeeId,
       name: user.name,
       email: user.email,
       role: user.role,
@@ -128,6 +129,7 @@ router.post('/register', async (req, res) => {
     // Remove password from response
     const userResponse = {
       _id: employee._id,
+      employeeId: employee.employeeId,
       name: employee.name,
       email: employee.email,
       role: employee.role,
@@ -184,6 +186,7 @@ router.get('/me', async (req, res) => {
 
     const userResponse = {
       _id: user._id,
+      employeeId: user.employeeId,
       name: user.name,
       email: user.email,
       role: user.role,

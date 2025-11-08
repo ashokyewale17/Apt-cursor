@@ -126,6 +126,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
       if (io) {
         io.emit('employeeAdded', {
           _id: employeeResponse._id,
+          employeeId: employeeResponse.employeeId,
           name: employeeResponse.name,
           email: employeeResponse.email,
           department: employeeResponse.department,

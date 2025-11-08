@@ -59,7 +59,8 @@ const Profile = () => {
           position: userData.position || '',
           department: userData.department || '',
           role: userData.role || 'employee',
-          _id: userData._id
+          _id: userData._id,
+          employeeId: userData.employeeId
         });
         
         setTempProfileData({
@@ -71,7 +72,8 @@ const Profile = () => {
           position: userData.position || '',
           department: userData.department || '',
           role: userData.role || 'employee',
-          _id: userData._id
+          _id: userData._id,
+          employeeId: userData.employeeId
         });
       } catch (err) {
         console.error('Error fetching profile:', err);
@@ -752,7 +754,7 @@ const Profile = () => {
                   color: '#0369a1',
                   letterSpacing: '0.1em'
                 }}>
-                  EMP-{(user._id || user.id || '').toString().slice(-4).padStart(4, '0')}
+                  {profileData.employeeId || user.employeeId || `EMP-${(user._id || user.id || '').toString().slice(-4).padStart(4, '0')}`}
                 </p>
               </div>
 
