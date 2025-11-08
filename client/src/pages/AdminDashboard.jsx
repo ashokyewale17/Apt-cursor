@@ -6,7 +6,7 @@ import {
   Users, Clock, FileText, TrendingUp, AlertCircle, CheckCircle, Calendar, Timer,
   BarChart3, DollarSign, Target, Award, Activity, Settings, RefreshCw, Download,
   Filter, Search, Plus, ArrowUpRight, ArrowDownRight, Eye, Edit, Trash2,
-  MapPin, Phone, Mail, Star, Briefcase, UserPlus, GitBranch, PieChart, TrendingDown, Edit3
+  MapPin, Phone, Mail, Star, Briefcase, UserPlus, GitBranch, PieChart, TrendingDown, Edit3, X
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, isToday, isThisWeek } from 'date-fns';
 
@@ -344,25 +344,34 @@ const AdminDashboard = () => {
   useEffect(() => {
     loadDashboardData();
     // Load real employees from API
-    const fetchEmployees = async () => {
+    const fetchEmployees = async (includeInactive = false) => {
       try {
         const token = localStorage.getItem('token');
-        const resp = await fetch('/api/employees?page=1&limit=100', {
+        const url = includeInactive 
+          ? '/api/employees?page=1&limit=100&includeInactive=true'
+          : '/api/employees?page=1&limit=100';
+        const resp = await fetch(url, {
           headers: {
             'Authorization': token ? `Bearer ${token}` : undefined
           }
         });
         const data = await resp.json();
         if (resp.ok && Array.isArray(data.employees)) {
-          // Normalize to match existing UI shape minimally
+          // Normalize to match existing UI shape with all fields
           const normalized = data.employees.map(e => ({
+            _id: e._id,
             id: e._id,
             name: e.name,
             email: e.email,
+            phone: e.phone,
+            address: e.address,
             department: e.department,
-            role: e.position,
-            status: e.isActive ? 'active' : 'inactive',
-            phone: e.phone
+            position: e.position,
+            role: e.role,
+            salary: e.salary,
+            dateOfJoining: e.dateOfJoining,
+            isActive: e.isActive,
+            status: e.isActive ? 'active' : 'inactive'
           }));
           setRealEmployees(normalized);
           try { localStorage.setItem('realEmployees', JSON.stringify(normalized)); } catch {}
@@ -372,6 +381,9 @@ const AdminDashboard = () => {
       }
     };
     fetchEmployees();
+    
+    // When employee modal opens, fetch all employees including inactive
+    // This will be handled by useEffect below
     generateAnalyticsData();
     
     // Immediately check for any recent check-ins after loading data
@@ -487,6 +499,44 @@ const AdminDashboard = () => {
   }, [checkForEmployeeCheckIns]);
 
   
+
+  // Fetch all employees (including inactive) when modal opens
+  useEffect(() => {
+    if (showEmployeeModal) {
+      const fetchAllEmployees = async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const resp = await fetch('/api/employees?page=1&limit=100&includeInactive=true', {
+            headers: {
+              'Authorization': token ? `Bearer ${token}` : undefined
+            }
+          });
+          const data = await resp.json();
+          if (resp.ok && Array.isArray(data.employees)) {
+            const normalized = data.employees.map(e => ({
+              _id: e._id,
+              id: e._id,
+              name: e.name,
+              email: e.email,
+              phone: e.phone,
+              address: e.address,
+              department: e.department,
+              position: e.position,
+              role: e.role,
+              salary: e.salary,
+              dateOfJoining: e.dateOfJoining,
+              isActive: e.isActive,
+              status: e.isActive ? 'active' : 'inactive'
+            }));
+            setRealEmployees(normalized);
+          }
+        } catch (err) {
+          console.error('Failed to fetch employees:', err);
+        }
+      };
+      fetchAllEmployees();
+    }
+  }, [showEmployeeModal]);
 
   // Load weekly attendance data when employees are loaded
   useEffect(() => {
@@ -1139,6 +1189,71 @@ const AdminDashboard = () => {
       ...prev,
       totalEmployees: updatedEmployees.length
     }));
+  };
+
+  const handleEmployeeStatusToggle = async (employee) => {
+    try {
+      const token = localStorage.getItem('token');
+      const employeeId = employee._id || employee.id;
+      const newStatus = !employee.isActive;
+      
+      const response = await fetch(`/api/employees/${employeeId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          isActive: newStatus
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update employee status');
+      }
+
+      const updatedEmployee = await response.json();
+      
+      // Update local state
+      const updatedEmployees = realEmployees.map(emp => 
+        (emp._id === employeeId || emp.id === employeeId) 
+          ? { ...emp, isActive: updatedEmployee.isActive, status: updatedEmployee.isActive ? 'active' : 'inactive' }
+          : emp
+      );
+      
+      setRealEmployees(updatedEmployees);
+      setEmployeeStatus(updatedEmployees);
+      
+      // Refresh employee list
+      const resp = await fetch('/api/employees?page=1&limit=100&includeInactive=true', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await resp.json();
+      if (resp.ok && Array.isArray(data.employees)) {
+        const normalized = data.employees.map(e => ({
+          _id: e._id,
+          id: e._id,
+          name: e.name,
+          email: e.email,
+          phone: e.phone,
+          address: e.address,
+          department: e.department,
+          position: e.position,
+          role: e.role,
+          salary: e.salary,
+          dateOfJoining: e.dateOfJoining,
+          isActive: e.isActive,
+          status: e.isActive ? 'active' : 'inactive'
+        }));
+        setRealEmployees(normalized);
+      }
+    } catch (err) {
+      console.error('Error updating employee status:', err);
+      alert(err.message || 'Failed to update employee status');
+    }
   };
 
   const handleAddEmployee = async (newEmployee) => {
@@ -3069,37 +3184,89 @@ const AdminDashboard = () => {
               </button>
             </div>
             
-            {/* Add Employee Form */}
-            <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'var(--background-alt)', borderRadius: '0.5rem' }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem' }}>Add New Employee</h3>
-              <EmployeeForm onSave={handleAddEmployee} onCancel={() => {}} />
+            {/* Search and Filter */}
+            <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Search size={20} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                <input
+                  type="text"
+                  placeholder="Search employees by name, email, or department..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem 0.75rem 3rem',
+                    border: '2px solid var(--border-color)',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}
+                />
+              </div>
+              <select
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                style={{
+                  padding: '0.75rem 1rem',
+                  border: '2px solid var(--border-color)',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  minWidth: '150px'
+                }}
+              >
+                <option value="all">All Departments</option>
+                <option value="Admin">Admin</option>
+                <option value="Software">Software</option>
+                <option value="Testing">Testing</option>
+                <option value="Operations">Operations</option>
+                <option value="Design">Design</option>
+                <option value="Embedded">Embedded</option>
+              </select>
             </div>
             
             {/* Employee List */}
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1200px' }}>
                 <thead>
                   <tr style={{ backgroundColor: 'var(--background-alt)' }}>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Name</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Email</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Password</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Department</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Role</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Status</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600' }}>Actions</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Employee</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Contact</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Position</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Department</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Role</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Join Date</th>
+                    <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Status</th>
+                    <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {realEmployees.map((employee) => (
-                    <EmployeeRow 
-                      key={employee.id} 
-                      employee={employee} 
-                      onEdit={handleEmployeeEdit}
-                      onDelete={handleEmployeeDelete}
-                      onSave={handleEmployeeSave}
-                      isEditing={selectedEmployee?.id === employee.id}
-                    />
-                  ))}
+                  {realEmployees.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        No employees found
+                      </td>
+                    </tr>
+                  ) : (
+                    realEmployees
+                      .filter(emp => {
+                        const matchesSearch = !searchTerm || 
+                          emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          emp.department?.toLowerCase().includes(searchTerm.toLowerCase());
+                        const matchesDepartment = departmentFilter === 'all' || emp.department === departmentFilter;
+                        return matchesSearch && matchesDepartment;
+                      })
+                      .map((employee) => (
+                        <EmployeeRow 
+                          key={employee.id || employee._id} 
+                          employee={employee} 
+                          onEdit={handleEmployeeEdit}
+                          onDelete={handleEmployeeDelete}
+                          onSave={handleEmployeeSave}
+                          onStatusToggle={handleEmployeeStatusToggle}
+                          isEditing={selectedEmployee?.id === employee.id || selectedEmployee?._id === employee._id}
+                        />
+                      ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -3702,154 +3869,185 @@ const EmployeeForm = ({ employee = {}, onSave, onCancel }) => {
 };
 
 // Employee Row Component
-const EmployeeRow = ({ employee, onEdit, onDelete, onSave, isEditing }) => {
+const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEditing }) => {
   const [editData, setEditData] = useState(employee);
+  const [isToggling, setIsToggling] = useState(false);
 
-  const handleSave = () => {
-    onSave(editData);
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    const d = new Date(date);
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  const handleCancel = () => {
-    setEditData(employee);
-    onEdit(null);
+  const formatCurrency = (amount) => {
+    if (!amount) return 'N/A';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
 
-  const handleChange = (e) => {
-    setEditData({ ...editData, [e.target.name]: e.target.value });
+  const handleStatusToggle = async () => {
+    if (window.confirm(`Are you sure you want to ${employee.isActive ? 'deactivate' : 'activate'} ${employee.name}?`)) {
+      setIsToggling(true);
+      try {
+        await onStatusToggle(employee);
+      } finally {
+        setIsToggling(false);
+      }
+    }
   };
 
   if (isEditing) {
     return (
       <tr style={{ backgroundColor: '#fffbeb' }}>
-        <td style={{ padding: '1rem' }}>
-          <input
-            type="text"
-            name="name"
-            value={editData.name}
-            onChange={handleChange}
-            className="form-control"
-            style={{ fontSize: '0.875rem', padding: '0.5rem' }}
-          />
-        </td>
-        <td style={{ padding: '1rem' }}>
-          <input
-            type="email"
-            name="email"
-            value={editData.email}
-            onChange={handleChange}
-            className="form-control"
-            style={{ fontSize: '0.875rem', padding: '0.5rem' }}
-          />
-        </td>
-        <td style={{ padding: '1rem' }}>
-          <input
-            type="text"
-            name="password"
-            value={editData.password}
-            onChange={handleChange}
-            className="form-control"
-            style={{ fontSize: '0.875rem', padding: '0.5rem' }}
-          />
-        </td>
-        <td style={{ padding: '1rem' }}>
-          <select
-            name="department"
-            value={editData.department}
-            onChange={handleChange}
-            className="form-control"
-            style={{ fontSize: '0.875rem', padding: '0.5rem' }}
-          >
-            <option value="Admin">Admin</option>
-            <option value="Software">Software</option>
-            <option value="Testing">Testing</option>
-            <option value="Operations">Operations</option>
-            <option value="Design">Design</option>
-            <option value="Embedded">Embedded</option>
-          </select>
-        </td>
-        <td style={{ padding: '1rem' }}>
-          <input
-            type="text"
-            name="role"
-            value={editData.role}
-            onChange={handleChange}
-            className="form-control"
-            style={{ fontSize: '0.875rem', padding: '0.5rem' }}
-          />
-        </td>
-        <td style={{ padding: '1rem' }}>
-          <select
-            name="status"
-            value={editData.status}
-            onChange={handleChange}
-            className="form-control"
-            style={{ fontSize: '0.875rem', padding: '0.5rem' }}
-          >
-            <option value="active">Active</option>
-            <option value="leave">On Leave</option>
-            <option value="late">Late</option>
-          </select>
-        </td>
-        <td style={{ padding: '1rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button onClick={handleSave} className="btn btn-sm btn-success">Save</button>
-            <button onClick={handleCancel} className="btn btn-sm btn-outline">Cancel</button>
+        <td colSpan="8" style={{ padding: '1rem' }}>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <span style={{ fontWeight: '600' }}>Editing: {employee.name}</span>
+            <button onClick={() => onEdit(null)} className="btn btn-sm btn-outline">
+              Cancel Edit
+            </button>
           </div>
         </td>
       </tr>
     );
   }
 
+  const isActive = employee.isActive !== false; // Default to true if undefined
+
   return (
-    <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-      <td style={{ padding: '1rem', fontWeight: '500' }}>{employee.name}</td>
-      <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{employee.email}</td>
+    <tr style={{ 
+      borderBottom: '1px solid var(--border-color)',
+      backgroundColor: !isActive ? '#fef2f2' : 'transparent',
+      opacity: !isActive ? 0.7 : 1
+    }}>
+      {/* Employee */}
       <td style={{ padding: '1rem' }}>
-        <span style={{
-          padding: '0.25rem 0.5rem',
-          backgroundColor: '#6b7280',
-          color: 'white',
-          borderRadius: '0.25rem',
-          fontSize: '0.75rem',
-          fontFamily: 'monospace'
-        }}>
-          {employee.password}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, var(--primary-color), #6366f1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontWeight: 'bold',
+            fontSize: '0.875rem'
+          }}>
+            {employee.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'E'}
+          </div>
+          <div>
+            <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>{employee.name || 'N/A'}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{employee.email || 'N/A'}</div>
+          </div>
+        </div>
       </td>
+      
+      {/* Contact */}
+      <td style={{ padding: '1rem' }}>
+        <div style={{ fontSize: '0.875rem' }}>
+          <div style={{ marginBottom: '0.25rem' }}>
+            <Phone size={12} style={{ display: 'inline', marginRight: '0.25rem', color: 'var(--text-secondary)' }} />
+            {employee.phone || 'N/A'}
+          </div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', wordBreak: 'break-word' }}>
+            {employee.address || 'N/A'}
+          </div>
+        </div>
+      </td>
+      
+      {/* Position */}
+      <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>
+        {employee.position || employee.role || 'N/A'}
+      </td>
+      
+      {/* Department */}
       <td style={{ padding: '1rem' }}>
         <span style={{
-          padding: '0.25rem 0.5rem',
+          padding: '0.25rem 0.75rem',
           backgroundColor: 'var(--primary-color)',
           color: 'white',
           borderRadius: '0.25rem',
-          fontSize: '0.75rem'
+          fontSize: '0.75rem',
+          fontWeight: '500'
         }}>
-          {employee.department}
+          {employee.department || 'N/A'}
         </span>
       </td>
-      <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{employee.role}</td>
+      
+      {/* Role */}
       <td style={{ padding: '1rem' }}>
-        <span className={`badge ${
-          employee.status === 'active' ? 'badge-success' :
-          employee.status === 'leave' ? 'badge-info' : 'badge-warning'
-        }`}>
-          {employee.status}
+        <span style={{
+          padding: '0.25rem 0.75rem',
+          backgroundColor: employee.role === 'admin' ? '#ef4444' : '#10b981',
+          color: 'white',
+          borderRadius: '0.25rem',
+          fontSize: '0.75rem',
+          fontWeight: '500',
+          textTransform: 'capitalize'
+        }}>
+          {employee.role || 'employee'}
         </span>
       </td>
-      <td style={{ padding: '1rem' }}>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button onClick={() => onEdit(employee)} className="btn btn-sm btn-outline">
-            <Edit size={14} /> Edit
-          </button>
+      
+      {/* Join Date */}
+      <td style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+        {formatDate(employee.dateOfJoining)}
+      </td>
+      
+      {/* Status */}
+      <td style={{ padding: '1rem', textAlign: 'center' }}>
+        <button
+          onClick={handleStatusToggle}
+          disabled={isToggling}
+          style={{
+            padding: '0.5rem 1rem',
+            border: 'none',
+            borderRadius: '0.375rem',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            cursor: isToggling ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s ease',
+            backgroundColor: isActive ? '#10b981' : '#6b7280',
+            color: 'white',
+            opacity: isToggling ? 0.6 : 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            margin: '0 auto'
+          }}
+          onMouseEnter={(e) => {
+            if (!isToggling) {
+              e.target.style.transform = 'scale(1.05)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'scale(1)';
+          }}
+        >
+          {isToggling ? (
+            <>
+              <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} />
+              {isActive ? 'Deactivating...' : 'Activating...'}
+            </>
+          ) : (
+            <>
+              {isActive ? <CheckCircle size={12} /> : <X size={12} />}
+              {isActive ? 'Active' : 'Inactive'}
+            </>
+          )}
+        </button>
+      </td>
+      
+      {/* Actions */}
+      <td style={{ padding: '1rem', textAlign: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
           <button 
-            onClick={() => {
-              if (window.confirm(`Are you sure you want to delete ${employee.name}?`)) {
-                onDelete(employee.id);
-              }
-            }} 
-            className="btn btn-sm btn-danger"
+            onClick={() => onEdit(employee)} 
+            className="btn btn-sm btn-outline"
+            style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem' }}
           >
-            <Trash2 size={14} /> Delete
+            <Edit size={12} style={{ marginRight: '0.25rem' }} />
+            Edit
           </button>
         </div>
       </td>

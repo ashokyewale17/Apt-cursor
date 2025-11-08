@@ -23,7 +23,10 @@ router.get('/', authenticateToken, async (req, res) => {
       });
     }
     
-    let query = { isActive: true };
+    // For admin, allow showing all employees (including inactive) if includeInactive is true
+    // Otherwise, show only active employees
+    const includeInactive = req.query.includeInactive === 'true';
+    let query = includeInactive ? {} : { isActive: true };
     
     // Search functionality
     if (search) {
@@ -155,7 +158,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
 // @access  Private
 router.put('/:id', authenticateToken, requireAdminOrSelf, async (req, res) => {
   try {
-    const { name, email, position, department, salary, phone, address, role } = req.body;
+    const { name, email, position, department, salary, phone, address, role, isActive } = req.body;
     
     // Check if another employee with the same email exists
     if (email) {
@@ -183,14 +186,19 @@ router.put('/:id', authenticateToken, requireAdminOrSelf, async (req, res) => {
       ...(email && { email }),
       ...(position && { position }),
       ...(department && { department }),
-      ...(salary && { salary }),
+      ...(salary !== undefined && { salary }),
       ...(phone && { phone }),
       ...(address && { address })
     };
     
-    // Only admin can change roles
-    if (role && req.user.role === 'admin') {
-      updateData.role = role;
+    // Only admin can change roles and status
+    if (req.user.role === 'admin') {
+      if (role) {
+        updateData.role = role;
+      }
+      if (isActive !== undefined) {
+        updateData.isActive = isActive;
+      }
     }
     
     // Validate that the ID is a valid ObjectId before using it

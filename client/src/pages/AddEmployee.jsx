@@ -15,7 +15,6 @@ const AddEmployee = () => {
     password: "",
     confirmPassword: "",
     hireDate: "",
-    salary: "",
     address: ""
   });
 
@@ -63,7 +62,7 @@ const AddEmployee = () => {
           role: (formData.role || 'Employee').toLowerCase() === 'admin' ? 'admin' : 'employee',
           password: formData.password,
           // hireDate maps to Employee.dateOfJoining if needed; backend sets default
-          salary: formData.salary ? Number(formData.salary) : 0,
+          salary: 0, // Default salary value
           address: formData.address
         }),
       });
@@ -81,7 +80,6 @@ const AddEmployee = () => {
           password: "",
           confirmPassword: "",
           hireDate: "",
-          salary: "",
           address: ""
         });
         // Navigate back to dashboard after 2 seconds
@@ -402,28 +400,6 @@ const AddEmployee = () => {
                       background: '#ffffff',
                       color: '#1f2937'
                     }}
-                  />
-                </div>
-
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                    Salary
-                  </label>
-                  <input
-                    type="number"
-                    name="salary"
-                    value={formData.salary}
-                    onChange={handleChange}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.875rem',
-                      background: '#ffffff',
-                      color: '#1f2937'
-                    }}
-                    placeholder="50000"
                   />
                 </div>
               </div>
