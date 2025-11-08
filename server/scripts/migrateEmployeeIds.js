@@ -5,13 +5,44 @@ const Employee = require('../models/Employee');
 // Connect to MongoDB
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/attendance-system', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
+    // Multiple connection string options (same as server config)
+    const connectionStrings = [
+      process.env.MONGODB_URI,
+      'mongodb://127.0.0.1:27017/employee_management',
+      'mongodb://localhost:27017/employee_management'
+    ].filter(Boolean);
+    
+    console.log('Attempting to connect to MongoDB...');
+    
+    let connected = false;
+    let lastError;
+    
+    for (const uri of connectionStrings) {
+      try {
+        console.log(`Trying: ${uri}`);
+        const conn = await mongoose.connect(uri, {
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+          serverSelectionTimeoutMS: 5000,
+        });
+        console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+        connected = true;
+        break;
+      } catch (err) {
+        lastError = err;
+        console.log(`❌ Failed: ${err.message}`);
+        continue;
+      }
+    }
+    
+    if (!connected) {
+      throw lastError || new Error('Could not connect to MongoDB');
+    }
   } catch (error) {
-    console.error('Error connecting to MongoDB:', error);
+    console.error('❌ Error connecting to MongoDB:', error.message);
+    console.log('\n📋 Make sure MongoDB is running:');
+    console.log('   - Windows: Check Services or run "net start MongoDB"');
+    console.log('   - Or start manually: mongod --dbpath "C:\\data\\db"');
     process.exit(1);
   }
 };
