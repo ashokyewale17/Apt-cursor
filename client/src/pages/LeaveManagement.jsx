@@ -230,11 +230,11 @@ const LeaveManagement = () => {
     // Calculate total days used
     const totalDaysUsed = approvedLeaves.reduce((acc, l) => acc + l.days, 0);
     
-    // Annual leave allowance (30 days)
-    const annualLeaveAllowance = 30;
+    // Annual leave allowance: 1 leave per month = 12 days per year
+    const annualLeaveAllowance = 12;
     const totalRemaining = Math.max(0, annualLeaveAllowance - totalDaysUsed);
     
-    // Calculate remaining leave per month
+    // Calculate remaining leave per month (1 day per month)
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthlyLeaveData = months.map((month, index) => {
       const monthLeaves = approvedLeaves.filter(leave => {
@@ -245,7 +245,7 @@ const LeaveManagement = () => {
       return {
         month,
         daysUsed,
-        remaining: Math.max(0, 2.5 - daysUsed) // Assuming 2.5 days per month (30 annual / 12 months)
+        remaining: Math.max(0, 1 - daysUsed) // 1 day per month (12 annual / 12 months)
       };
     });
     
@@ -432,7 +432,7 @@ const LeaveManagement = () => {
               </div>
               </div>
               <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Days Remaining</div>
-              <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>Out of 30 annual days</div>
+              <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>Out of 12 annual days (1 per month)</div>
               <div style={{
                 width: '100%',
                 height: '4px',
@@ -442,7 +442,7 @@ const LeaveManagement = () => {
                 overflow: 'hidden'
               }}>
                 <div style={{
-                  width: `${Math.min(100, (leaveDetails.totalRemaining / 30) * 100)}%`,
+                  width: `${Math.min(100, (leaveDetails.totalRemaining / 12) * 100)}%`,
                   height: '100%',
                   background: 'rgba(255, 255, 255, 0.8)',
                   borderRadius: '2px',
@@ -635,7 +635,7 @@ const LeaveManagement = () => {
             }}>
               <span>Utilization Rate</span>
               <span style={{ fontWeight: '600' }}>
-                {Math.round((leaveDetails.totalUsed / 30) * 100)}%
+                {Math.round((leaveDetails.totalUsed / 12) * 100)}%
               </span>
             </div>
           </div>
@@ -1179,7 +1179,7 @@ const LeaveManagement = () => {
                   <div>
                     <h4 style={{ margin: '0 0 0.5rem 0' }}>Annual Leave Balance</h4>
                     <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
-                      Total remaining: {leaveDetails.totalRemaining} days out of 30 annual days
+                      Total remaining: {leaveDetails.totalRemaining} days out of 12 annual days (1 per month)
                     </p>
                   </div>
                   <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#10b981' }}>
@@ -1194,7 +1194,7 @@ const LeaveManagement = () => {
                   overflow: 'hidden'
                 }}>
                   <div style={{
-                    width: `${(leaveDetails.totalRemaining / 30) * 100}%`,
+                    width: `${Math.min(100, (leaveDetails.totalRemaining / 12) * 100)}%`,
                     height: '100%',
                     background: '#10b981',
                     borderRadius: '4px'
@@ -1232,9 +1232,9 @@ const LeaveManagement = () => {
                       overflow: 'hidden'
                     }}>
                       <div style={{
-                        width: `${(monthData.daysUsed / 2.5) * 100}%`,
+                        width: `${Math.min(100, (monthData.daysUsed / 1) * 100)}%`,
                         height: '100%',
-                        background: monthData.daysUsed > 2.5 ? '#ef4444' : '#3b82f6',
+                        background: monthData.daysUsed > 1 ? '#ef4444' : '#3b82f6',
                         borderRadius: '2px'
                       }}></div>
                     </div>

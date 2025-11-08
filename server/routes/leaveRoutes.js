@@ -288,20 +288,19 @@ router.get("/stats", authenticateToken, async (req, res) => {
     const allLeaves = await Leave.find(query);
     
     // Calculate statistics
+    // Annual leave allowance: 1 leave per month = 12 days per year
+    const annualLeaveAllowance = 12;
+    const totalDaysUsed = allLeaves
+      .filter(l => l.status === "approved")
+      .reduce((sum, l) => sum + l.days, 0);
+    
     const stats = {
       totalPending: allLeaves.filter(l => l.status === "pending").length,
       totalApproved: allLeaves.filter(l => l.status === "approved").length,
       totalRejected: allLeaves.filter(l => l.status === "rejected").length,
-      totalDaysUsed: allLeaves
-        .filter(l => l.status === "approved")
-        .reduce((sum, l) => sum + l.days, 0),
-      totalDaysRemaining: 30 - allLeaves
-        .filter(l => l.status === "approved")
-        .reduce((sum, l) => sum + l.days, 0)
+      totalDaysUsed: totalDaysUsed,
+      totalDaysRemaining: Math.max(0, annualLeaveAllowance - totalDaysUsed)
     };
-    
-    // Ensure remaining days is not negative
-    stats.totalDaysRemaining = Math.max(0, stats.totalDaysRemaining);
     
     res.json(stats);
   } catch (error) {
