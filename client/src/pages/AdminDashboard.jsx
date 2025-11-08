@@ -1868,38 +1868,6 @@ const AdminDashboard = () => {
             <ArrowUpRight size={14} style={{ display: 'inline' }} /> Employees with comp off days
           </div>
         </div>
-
-        <div className="stat-card" style={{ borderLeft: '4px solid #8b5cf6', cursor: 'pointer', transition: 'all 0.2s ease' }}
-             onClick={() => {
-               setShowWorkingSaturdaysModal(true);
-               loadWorkingSaturdays();
-             }}
-             onMouseEnter={(e) => {
-               e.currentTarget.style.transform = 'translateY(-2px)';
-               e.currentTarget.style.boxShadow = '0 8px 25px rgba(139, 92, 246, 0.15)';
-             }}
-             onMouseLeave={(e) => {
-               e.currentTarget.style.transform = 'translateY(0)';
-               e.currentTarget.style.boxShadow = '';
-             }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <div className="stat-value" style={{ color: '#8b5cf6' }}>
-                {workingSaturdays.filter(ws => ws.isWorking).length}
-              </div>
-              <div className="stat-label">
-                <Calendar size={16} style={{ display: 'inline', marginRight: '0.25rem' }} />
-                Working Saturdays
-              </div>
-            </div>
-            <div style={{ padding: '0.5rem', background: '#8b5cf6', borderRadius: '0.5rem' }}>
-              <Calendar size={20} style={{ color: 'white' }} />
-            </div>
-          </div>
-          <div style={{ fontSize: '0.875rem', color: '#8b5cf6', marginTop: '0.5rem' }}>
-            <ArrowUpRight size={14} style={{ display: 'inline' }} /> Click to manage working Saturdays
-          </div>
-        </div>
       </div>
 
       {/* Filters and Search */}
@@ -2711,55 +2679,96 @@ const AdminDashboard = () => {
         }}>
           <div style={{
             backgroundColor: 'white',
-            borderRadius: '0.75rem',
-            padding: '2rem',
+            borderRadius: '1rem',
+            padding: '0',
             width: '90%',
-            maxWidth: '800px',
+            maxWidth: '900px',
             maxHeight: '90vh',
-            overflow: 'auto',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            flexDirection: 'column'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Settings size={24} />
+            {/* Modal Header */}
+            <div style={{ 
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              padding: '1.5rem 2rem',
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              color: 'white'
+            }}>
+              <h2 style={{ fontSize: '1.75rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Settings size={28} />
                 System Settings
               </h2>
               <button 
                 onClick={() => setShowSettingsModal(false)}
                 style={{
-                  background: 'none',
+                  background: 'rgba(255, 255, 255, 0.2)',
                   border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
                   fontSize: '1.5rem',
                   cursor: 'pointer',
-                  color: 'var(--text-secondary)'
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                  e.currentTarget.style.transform = 'rotate(90deg)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.transform = 'rotate(0deg)';
                 }}
               >
                 ×
               </button>
             </div>
             
+            {/* Modal Body */}
+            <div style={{
+              padding: '2rem',
+              overflowY: 'auto',
+              flex: 1
+            }}>
+            
             {/* Settings Content */}
-            <div style={{ display: 'grid', gap: '2rem' }}>
+            <div style={{ display: 'grid', gap: '1.5rem' }}>
               {/* Company Information */}
-              <div className="card">
-                <div className="card-header">
-                  <h3 className="card-title">Company Information</h3>
+              <div className="card" style={{ 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                border: 'none',
+                color: 'white'
+              }}>
+                <div className="card-header" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                  <h3 className="card-title" style={{ color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Briefcase size={20} />
+                    Company Information
+                  </h3>
                 </div>
                 <div className="card-body">
                   <div style={{ display: 'grid', gap: '1rem' }}>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Company Name</label>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)' }}>Company Name</label>
                       <input 
                         type="text" 
                         value={settings.companyName}
                         onChange={(e) => setSettings({...settings, companyName: e.target.value})}
+                        placeholder="Enter company name"
                         style={{ 
                           width: '100%', 
-                          padding: '0.5rem', 
-                          borderRadius: '0.375rem', 
-                          border: '1px solid var(--border-color)',
-                          backgroundColor: 'white',
-                          color: 'black'
+                          padding: '0.75rem', 
+                          borderRadius: '0.5rem', 
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          color: 'black',
+                          fontSize: '1rem'
                         }}
                       />
                     </div>
@@ -2767,38 +2776,22 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              {/* Working Saturdays Management */}
-              <div className="card">
-                <div className="card-header">
-                  <h3 className="card-title">Working Saturdays</h3>
+              {/* Working Hours Configuration */}
+              <div className="card" style={{ 
+                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                border: 'none',
+                color: 'white'
+              }}>
+                <div className="card-header" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                  <h3 className="card-title" style={{ color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Clock size={20} />
+                    Working Hours Configuration
+                  </h3>
                 </div>
                 <div className="card-body">
-                  <p style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>
-                    Manage specific Saturdays as working days. Employees will be able to check in/out on these days.
-                  </p>
-                  <button 
-                    onClick={() => {
-                      setShowWorkingSaturdaysModal(true);
-                      loadWorkingSaturdays();
-                    }}
-                    className="btn btn-primary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                  >
-                    <Calendar size={16} />
-                    Manage Working Saturdays
-                  </button>
-                </div>
-              </div>
-
-              {/* Working Hours */}
-              <div className="card">
-                <div className="card-header">
-                  <h3 className="card-title">Working Hours Configuration</h3>
-                </div>
-                <div className="card-body">
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Start Time</label>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)' }}>Start Time</label>
                       <input 
                         type="time" 
                         value={settings.workingHours.start}
@@ -2808,16 +2801,17 @@ const AdminDashboard = () => {
                         })}
                         style={{ 
                           width: '100%', 
-                          padding: '0.5rem', 
-                          borderRadius: '0.375rem', 
-                          border: '1px solid var(--border-color)',
-                          backgroundColor: 'white',
-                          color: 'black'
+                          padding: '0.75rem', 
+                          borderRadius: '0.5rem', 
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          color: 'black',
+                          fontSize: '1rem'
                         }}
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>End Time</label>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)' }}>End Time</label>
                       <input 
                         type="time" 
                         value={settings.workingHours.end}
@@ -2827,21 +2821,52 @@ const AdminDashboard = () => {
                         })}
                         style={{ 
                           width: '100%', 
-                          padding: '0.5rem', 
-                          borderRadius: '0.375rem', 
-                          border: '1px solid var(--border-color)',
-                          backgroundColor: 'white',
-                          color: 'black'
+                          padding: '0.75rem', 
+                          borderRadius: '0.5rem', 
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          color: 'black',
+                          fontSize: '1rem'
                         }}
                       />
                     </div>
                   </div>
                   
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Working Days</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)' }}>Working Days</label>
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', 
+                      gap: '0.75rem',
+                      padding: '1rem',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      borderRadius: '0.5rem',
+                      backdropFilter: 'blur(10px)'
+                    }}>
                       {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                        <label key={day} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
+                        <label 
+                          key={day} 
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '0.5rem', 
+                            cursor: 'pointer',
+                            padding: '0.5rem',
+                            borderRadius: '0.375rem',
+                            background: settings.workingDays.includes(day) ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!settings.workingDays.includes(day)) {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!settings.workingDays.includes(day)) {
+                              e.currentTarget.style.background = 'transparent';
+                            }
+                          }}
+                        >
                           <input 
                             type="checkbox" 
                             checked={settings.workingDays.includes(day)}
@@ -2852,91 +2877,89 @@ const AdminDashboard = () => {
                                 setSettings({...settings, workingDays: settings.workingDays.filter(d => d !== day)});
                               }
                             }}
+                            style={{ 
+                              width: '18px', 
+                              height: '18px', 
+                              cursor: 'pointer',
+                              accentColor: 'white'
+                            }}
                           />
-                          <span style={{ fontSize: '0.875rem' }}>{day}</span>
+                          <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>{day}</span>
                         </label>
                       ))}
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Thresholds */}
-              <div className="card">
-                <div className="card-header">
-                  <h3 className="card-title">Alert Thresholds</h3>
-                </div>
-                <div className="card-body">
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Overtime Threshold (hours/week)</label>
-                      <input 
-                        type="number" 
-                        value={settings.overtimeThreshold}
-                        onChange={(e) => setSettings({...settings, overtimeThreshold: parseInt(e.target.value)})}
-                        style={{ 
-                          width: '100%', 
-                          padding: '0.5rem', 
-                          borderRadius: '0.375rem', 
-                          border: '1px solid var(--border-color)',
-                          backgroundColor: 'white',
-                          color: 'black'
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Late Threshold (minutes)</label>
-                      <input 
-                        type="number" 
-                        value={settings.lateThreshold}
-                        onChange={(e) => setSettings({...settings, lateThreshold: parseInt(e.target.value)})}
-                        style={{ 
-                          width: '100%', 
-                          padding: '0.5rem', 
-                          borderRadius: '0.375rem', 
-                          border: '1px solid var(--border-color)',
-                          backgroundColor: 'white',
-                          color: 'black'
-                        }}
-                      />
-                    </div>
+                    <p style={{ marginTop: '0.75rem', fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.7)', fontStyle: 'italic' }}>
+                      Note: Working Saturdays can be managed separately using the "Manage Working Saturdays" button in the header.
+                    </p>
                   </div>
                 </div>
               </div>
 
               {/* System Preferences */}
-              <div className="card">
-                <div className="card-header">
-                  <h3 className="card-title">System Preferences</h3>
+              <div className="card" style={{ 
+                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                border: 'none',
+                color: 'white'
+              }}>
+                <div className="card-header" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                  <h3 className="card-title" style={{ color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Settings size={20} />
+                    System Preferences
+                  </h3>
                 </div>
                 <div className="card-body">
-                  <div style={{ display: 'grid', gap: '1rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={settings.autoBackup}
-                        onChange={(e) => setSettings({...settings, autoBackup: e.target.checked})}
-                      />
-                      <span>Enable Automatic Backup</span>
-                    </label>
+                  <div style={{ display: 'grid', gap: '1.5rem' }}>
+                    <div style={{ 
+                      padding: '1rem', 
+                      background: 'rgba(255, 255, 255, 0.1)', 
+                      borderRadius: '0.5rem',
+                      backdropFilter: 'blur(10px)'
+                    }}>
+                      <label style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '0.75rem', 
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        fontWeight: '500'
+                      }}>
+                        <input 
+                          type="checkbox" 
+                          checked={settings.autoBackup}
+                          onChange={(e) => setSettings({...settings, autoBackup: e.target.checked})}
+                          style={{ 
+                            width: '20px', 
+                            height: '20px', 
+                            cursor: 'pointer',
+                            accentColor: 'white'
+                          }}
+                        />
+                        <span>Enable Automatic Backup</span>
+                      </label>
+                      <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.7)', marginLeft: '2rem' }}>
+                        Automatically backup employee data and attendance records
+                      </p>
+                    </div>
                     
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Theme</label>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)' }}>Theme</label>
                       <select 
                         value={settings.theme}
                         onChange={(e) => setSettings({...settings, theme: e.target.value})}
                         style={{ 
                           width: '100%', 
-                          padding: '0.5rem', 
-                          borderRadius: '0.375rem', 
-                          border: '1px solid var(--border-color)',
-                          backgroundColor: 'white',
-                          color: 'black'
+                          padding: '0.75rem', 
+                          borderRadius: '0.5rem', 
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          color: 'black',
+                          fontSize: '1rem',
+                          cursor: 'pointer'
                         }}
                       >
-                        <option value="light">Light</option>
-                        <option value="dark">Dark</option>
-                        <option value="auto">Auto</option>
+                        <option value="light">Light Mode</option>
+                        <option value="dark">Dark Mode</option>
+                        <option value="auto">Auto (System Preference)</option>
                       </select>
                     </div>
                   </div>
@@ -2944,10 +2967,35 @@ const AdminDashboard = () => {
               </div>
 
               {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+              <div style={{ 
+                display: 'flex', 
+                gap: '1rem', 
+                justifyContent: 'flex-end', 
+                paddingTop: '1.5rem', 
+                borderTop: '2px solid var(--border-color)',
+                marginTop: '0.5rem'
+              }}>
                 <button 
                   onClick={() => setShowSettingsModal(false)}
-                  className="btn btn-outline"
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    border: '2px solid var(--border-color)',
+                    background: 'white',
+                    color: 'var(--text-primary)',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    fontSize: '1rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--background-alt)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'white';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
                 >
                   Cancel
                 </button>
@@ -2958,7 +3006,26 @@ const AdminDashboard = () => {
                     alert('Settings saved successfully!');
                     setShowSettingsModal(false);
                   }}
-                  className="btn btn-primary"
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    fontSize: '1rem',
+                    boxShadow: '0 4px 6px -1px rgba(102, 126, 234, 0.3)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 8px 15px -3px rgba(102, 126, 234, 0.4)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(102, 126, 234, 0.3)';
+                  }}
                 >
                   Save Settings
                 </button>
