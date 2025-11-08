@@ -71,6 +71,7 @@ const startServer = async () => {
     app.use("/api/attendance-edit", require("./routes/attendanceEditRoutes"));
     app.use("/api/attendance-records", require("./routes/attendanceRoutes"));
     app.use("/api/leaves", require("./routes/leaveRoutes"));
+    app.use("/api/working-saturdays", require("./routes/workingSaturdayRoutes"));
 
     // Enhanced Health check endpoint with more details
     app.get('/api/health', (req, res) => {

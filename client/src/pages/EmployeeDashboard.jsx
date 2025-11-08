@@ -35,6 +35,7 @@ const EmployeeDashboard = () => {
   const [showLocationDialog, setShowLocationDialog] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState('');
   const [siteName, setSiteName] = useState('');
+  const [workingSaturdays, setWorkingSaturdays] = useState(new Set());
 
   // Update current time every second
   useEffect(() => {
@@ -54,7 +55,35 @@ const EmployeeDashboard = () => {
     loadWeeklyData();
     loadStats();
     loadRecentActivity();
+    loadWorkingSaturdays();
   }, []);
+
+  const loadWorkingSaturdays = async () => {
+    try {
+      const today = new Date();
+      const weekStart = startOfWeek(today);
+      const weekEnd = endOfWeek(today);
+      
+      const startDateStr = format(weekStart, 'yyyy-MM-dd');
+      const endDateStr = format(weekEnd, 'yyyy-MM-dd');
+      
+      const response = await fetch(
+        `/api/working-saturdays?startDate=${startDateStr}&endDate=${endDateStr}`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        const workingSaturdaySet = new Set(
+          data
+            .filter(ws => ws.isWorking)
+            .map(ws => format(new Date(ws.date), 'yyyy-MM-dd'))
+        );
+        setWorkingSaturdays(workingSaturdaySet);
+      }
+    } catch (error) {
+      console.error('Error loading working Saturdays:', error);
+    }
+  };
 
   const updateWorkingTime = () => {
     if (checkInTime) {
@@ -288,10 +317,12 @@ const EmployeeDashboard = () => {
         const dateKey = format(day, 'yyyy-MM-dd');
         const record = recordsMap.get(dateKey);
         const isToday = isSameDay(day, today);
-        const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+        const isSaturday = day.getDay() === 6;
+        const isSunday = day.getDay() === 0;
+        const isWorkingSaturday = isSaturday && workingSaturdays.has(dateKey);
         
-        // Handle weekends
-        if (isWeekend) {
+        // Handle Sunday (always non-working)
+        if (isSunday) {
           return {
             date: day,
             worked: '0h 0m',
@@ -299,14 +330,50 @@ const EmployeeDashboard = () => {
           };
         }
         
+        // Handle non-working Saturdays
+        if (isSaturday && !isWorkingSaturday) {
+          return {
+            date: day,
+            worked: '0h 0m',
+            status: 'absent'
+          };
+        }
+        
+        // Working Saturdays are treated like regular working days (continue processing)
+        
         // Handle days with attendance records
         if (record) {
           const dbStatus = record.status || 'Present';
+          const isCompOffDay = record.compOff === true || dbStatus === 'CompOff';
           let worked = '0h 0m';
           let status = 'absent';
           
           if (dbStatus === 'Leave' || dbStatus === 'Holiday' || dbStatus === 'Absent') {
             status = 'absent';
+          } else if (isCompOffDay && record.inTime) {
+            // Comp off day with check-in
+            if (record.outTime) {
+              const checkIn = new Date(record.inTime);
+              const checkOut = new Date(record.outTime);
+              const diffMs = checkOut - checkIn;
+              const hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
+              const hours = Math.floor(hoursWorked);
+              const minutes = Math.round((hoursWorked - hours) * 60);
+              worked = `${hours}h ${minutes}m`;
+              status = 'completed';
+            } else if (isToday) {
+              status = 'active';
+              const checkIn = new Date(record.inTime);
+              const now = new Date();
+              const diffMs = now - checkIn;
+              const hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
+              const hours = Math.floor(hoursWorked);
+              const minutes = Math.round((hoursWorked - hours) * 60);
+              worked = `${hours}h ${minutes}m`;
+            } else {
+              status = 'completed';
+              worked = '0h 0m';
+            }
           } else if (record.inTime) {
             if (record.outTime) {
               // Has check-out time - completed day

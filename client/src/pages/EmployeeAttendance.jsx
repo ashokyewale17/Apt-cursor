@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
 import { 
   Calendar, Clock, TrendingUp, Download, Filter, ChevronLeft, ChevronRight,
-  CheckCircle, XCircle, AlertCircle, BarChart3, Timer, Coffee, X, Eye, Edit, Save, AlertTriangle
+  CheckCircle, XCircle, AlertCircle, BarChart3, Timer, Coffee, X, Eye, Edit, Save, AlertTriangle, Award
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isWeekend } from 'date-fns';
 
@@ -18,6 +18,7 @@ const EmployeeAttendance = () => {
   const [editingDay, setEditingDay] = useState(null);
   const [editData, setEditData] = useState({ inTime: '', outTime: '', reason: '' });
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [workingSaturdays, setWorkingSaturdays] = useState(new Set());
 
   useEffect(() => {
     loadAttendanceData();
@@ -34,6 +35,27 @@ const EmployeeAttendance = () => {
     setLoading(true);
     
     try {
+      // First, load working Saturdays for the month
+      const monthStart = startOfMonth(currentMonth);
+      const monthEnd = endOfMonth(currentMonth);
+      const startDateStr = format(monthStart, 'yyyy-MM-dd');
+      const endDateStr = format(monthEnd, 'yyyy-MM-dd');
+      
+      const workingSaturdayResponse = await fetch(
+        `/api/working-saturdays?startDate=${startDateStr}&endDate=${endDateStr}`
+      );
+      
+      let workingSaturdaySet = new Set();
+      if (workingSaturdayResponse.ok) {
+        const workingSaturdayData = await workingSaturdayResponse.json();
+        workingSaturdaySet = new Set(
+          workingSaturdayData
+            .filter(ws => ws.isWorking)
+            .map(ws => format(new Date(ws.date), 'yyyy-MM-dd'))
+        );
+        setWorkingSaturdays(workingSaturdaySet);
+      }
+      
       // Get month and year for API call
       const month = currentMonth.getMonth() + 1; // API expects 1-12
       const year = currentMonth.getFullYear();
@@ -43,9 +65,7 @@ const EmployeeAttendance = () => {
       const response = await fetch(`/api/attendance-records/employee/${employeeId}/${month}/${year}`);
       const records = response.ok ? await response.json() : [];
       
-      // Generate all days in the month
-      const monthStart = startOfMonth(currentMonth);
-      const monthEnd = endOfMonth(currentMonth);
+      // Generate all days in the month (using already declared monthStart and monthEnd)
       const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
       
       // Create a map of date -> attendance record for quick lookup
@@ -58,14 +78,30 @@ const EmployeeAttendance = () => {
       
       // Process each day of the month
       const attendanceData = monthDays.map(day => {
-        const isWeekendDay = isWeekend(day);
         const dayOfMonth = day.getDate();
         const record = recordsMap.get(dayOfMonth);
         const isToday = isSameDay(day, new Date());
         const isPast = day < new Date();
+        const isSaturday = day.getDay() === 6;
+        const isSunday = day.getDay() === 0;
+        const dayKey = format(day, 'yyyy-MM-dd');
+        const isWorkingSaturday = isSaturday && workingSaturdaySet.has(dayKey);
         
-        // Handle weekends
-        if (isWeekendDay) {
+        // Handle Sunday (always non-working)
+        if (isSunday) {
+          return {
+            date: day,
+            status: 'weekend',
+            checkIn: null,
+            checkOut: null,
+            totalHours: '0h 0m',
+            breaks: 0,
+            notes: 'Sunday'
+          };
+        }
+        
+        // Handle non-working Saturdays - always show as weekend
+        if (isSaturday && !isWorkingSaturday) {
           return {
             date: day,
             status: 'weekend',
@@ -77,9 +113,12 @@ const EmployeeAttendance = () => {
           };
         }
         
+        // Working Saturdays are treated like regular working days (continue processing)
+        
         // Handle days with attendance records
         if (record) {
           const dbStatus = record.status || 'Present';
+          const isCompOffDay = record.compOff === true || dbStatus === 'CompOff';
           let status = 'absent';
           let checkIn = null;
           let checkOut = null;
@@ -92,6 +131,27 @@ const EmployeeAttendance = () => {
           } else if (dbStatus === 'Absent') {
             status = 'absent';
             notes = 'Absent';
+          } else if (isCompOffDay) {
+            // Comp off day - show as completed with comp off note
+            if (record.inTime) {
+              checkIn = new Date(record.inTime);
+              if (record.outTime) {
+                checkOut = new Date(record.outTime);
+                const diffMs = checkOut - checkIn;
+                const hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
+                const hours = Math.floor(hoursWorked);
+                const minutes = Math.round((hoursWorked - hours) * 60);
+                totalHours = `${hours}h ${minutes}m`;
+                status = 'completed';
+                notes = 'Comp Off';
+              } else {
+                status = isToday ? 'active' : 'completed';
+                notes = 'Comp Off';
+              }
+            } else {
+              status = 'weekend';
+              notes = 'Weekend';
+            }
           } else if (record.inTime) {
             // Has check-in time
             checkIn = new Date(record.inTime);
@@ -192,7 +252,7 @@ const EmployeeAttendance = () => {
       });
       
       setAttendanceData(attendanceData);
-      calculateMonthlyStats(attendanceData);
+      calculateMonthlyStats(attendanceData, workingSaturdaySet);
       console.log('✅ Loaded attendance data from database for', month, year);
     } catch (error) {
       console.error('Error loading attendance data:', error);
@@ -231,11 +291,65 @@ const EmployeeAttendance = () => {
     }
   };
 
-  const calculateMonthlyStats = (data) => {
+  const loadWorkingSaturdays = async () => {
+    try {
+      const monthStart = startOfMonth(currentMonth);
+      const monthEnd = endOfMonth(currentMonth);
+      
+      // Format dates for API call
+      const startDateStr = format(monthStart, 'yyyy-MM-dd');
+      const endDateStr = format(monthEnd, 'yyyy-MM-dd');
+      
+      const response = await fetch(
+        `/api/working-saturdays?startDate=${startDateStr}&endDate=${endDateStr}`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Create a Set of working Saturday dates (as strings for easy lookup)
+        const workingSaturdaySet = new Set(
+          data
+            .filter(ws => ws.isWorking)
+            .map(ws => format(new Date(ws.date), 'yyyy-MM-dd'))
+        );
+        setWorkingSaturdays(workingSaturdaySet);
+      } else {
+        setWorkingSaturdays(new Set());
+      }
+    } catch (error) {
+      console.error('Error loading working Saturdays:', error);
+      setWorkingSaturdays(new Set());
+    }
+  };
+
+  const calculateMonthlyStats = (data, workingSaturdaySet = workingSaturdays) => {
     const totalDays = data.length;
-    const workingDays = data.filter(d => !isWeekend(d.date) && d.date <= new Date()).length;
-    const presentDays = data.filter(d => (d.status === 'completed' || d.status === 'active') && !isWeekend(d.date)).length;
-    const absentDays = data.filter(d => d.status === 'absent' && !isWeekend(d.date) && d.date <= new Date()).length;
+    // Working days include weekdays and working Saturdays that are in the past or today
+    const workingDays = data.filter(d => {
+      const isWeekendDay = isWeekend(d.date);
+      const isSaturday = d.date.getDay() === 6;
+      const dayKey = format(d.date, 'yyyy-MM-dd');
+      const isWorkingSaturday = isSaturday && workingSaturdaySet.has(dayKey);
+      return (!isWeekendDay || isWorkingSaturday) && d.date <= new Date();
+    }).length;
+    
+    const presentDays = data.filter(d => {
+      const isWeekendDay = isWeekend(d.date);
+      const isSaturday = d.date.getDay() === 6;
+      const dayKey = format(d.date, 'yyyy-MM-dd');
+      const isWorkingSaturday = isSaturday && workingSaturdaySet.has(dayKey);
+      return (d.status === 'completed' || d.status === 'active') && (!isWeekendDay || isWorkingSaturday) && d.notes !== 'Comp Off';
+    }).length;
+    
+    const absentDays = data.filter(d => {
+      const isWeekendDay = isWeekend(d.date);
+      const isSaturday = d.date.getDay() === 6;
+      const dayKey = format(d.date, 'yyyy-MM-dd');
+      const isWorkingSaturday = isSaturday && workingSaturdaySet.has(dayKey);
+      return d.status === 'absent' && (!isWeekendDay || isWorkingSaturday) && d.date <= new Date();
+    }).length;
+    
+    const compOffDays = data.filter(d => d.notes === 'Comp Off').length;
     const lateDays = data.filter(d => d.notes === 'Late arrival').length;
     
     // Calculate total hours from all completed days
@@ -261,13 +375,15 @@ const EmployeeAttendance = () => {
       workingDays,
       presentDays,
       absentDays,
+      compOffDays,
       lateDays,
       totalHours: `${hours}h ${minutes}m`,
       attendanceRate: workingDays > 0 ? Math.round((presentDays / workingDays) * 100) : 0
     });
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status, notes) => {
+    if (notes === 'Comp Off') return '#8b5cf6'; // Purple for comp off
     switch (status) {
       case 'completed': return '#10b981';
       case 'active': return '#3b82f6';
@@ -277,7 +393,8 @@ const EmployeeAttendance = () => {
     }
   };
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status, notes) => {
+    if (notes === 'Comp Off') return <Award size={16} />; // Award icon for comp off
     switch (status) {
       case 'completed': return <CheckCircle size={16} />;
       case 'active': return <Clock size={16} />;
@@ -330,6 +447,10 @@ const EmployeeAttendance = () => {
       case 'late':
         filtered = attendanceData.filter(d => d.notes === 'Late arrival');
         title = 'Late Days';
+        break;
+      case 'compoff':
+        filtered = attendanceData.filter(d => d.notes === 'Comp Off');
+        title = 'Comp Off Days';
         break;
       default:
         return;
@@ -649,6 +770,50 @@ const EmployeeAttendance = () => {
           </div>
           <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>Total Hours</div>
         </div>
+        
+        <div 
+          onClick={() => handleCardClick('compoff')}
+          style={{
+            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+            borderRadius: '1rem',
+            padding: '1.5rem',
+            color: 'white',
+            textAlign: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'translateY(-5px) scale(1.02)';
+            e.target.style.boxShadow = '0 15px 30px rgba(139, 92, 246, 0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'translateY(0) scale(1)';
+            e.target.style.boxShadow = 'none';
+          }}
+        >
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <div style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              <Award size={24} />
+              {monthlyStats.compOffDays || 0}
+            </div>
+            <div style={{ fontSize: '0.875rem', opacity: 0.8, marginBottom: '0.5rem' }}>Comp Off Days</div>
+            <div style={{ fontSize: '0.75rem', opacity: 0.7, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+              <Eye size={12} />
+              Click to view details
+            </div>
+          </div>
+          <div style={{
+            position: 'absolute',
+            top: '-20px',
+            right: '-20px',
+            width: '80px',
+            height: '80px',
+            background: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: '50%'
+          }}></div>
+        </div>
       </div>
 
       {/* Month Navigation */}
@@ -765,13 +930,13 @@ const EmployeeAttendance = () => {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
               {attendanceData.map((day, index) => (
-                <div key={index} style={{
-                  border: `2px solid ${getStatusColor(day.status)}`,
-                  borderRadius: '0.75rem',
-                  padding: '1rem',
-                  background: 'white',
-                  transition: 'all 0.2s ease'
-                }}>
+                <div key={index}                     style={{
+                      border: `2px solid ${getStatusColor(day.status, day.notes)}`,
+                      borderRadius: '0.75rem',
+                      padding: '1rem',
+                      background: 'white',
+                      transition: 'all 0.2s ease'
+                    }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                     <div>
                       <div style={{ fontWeight: '600', fontSize: '1rem' }}>
@@ -785,11 +950,11 @@ const EmployeeAttendance = () => {
                       display: 'flex', 
                       alignItems: 'center', 
                       gap: '0.5rem',
-                      color: getStatusColor(day.status)
+                      color: getStatusColor(day.status, day.notes)
                     }}>
-                      {getStatusIcon(day.status)}
+                      {getStatusIcon(day.status, day.notes)}
                       <span style={{ fontSize: '0.875rem', fontWeight: '500', textTransform: 'capitalize' }}>
-                        {day.status}
+                        {day.notes === 'Comp Off' ? 'Comp Off' : day.status}
                       </span>
                     </div>
                   </div>
@@ -911,7 +1076,7 @@ const EmployeeAttendance = () => {
                           </div>
                           <div>
                             <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Total Hours</div>
-                            <div style={{ fontWeight: '500', color: getStatusColor(day.status) }}>
+                            <div style={{ fontWeight: '500', color: getStatusColor(day.status, day.notes) }}>
                               {day.totalHours}
                             </div>
                           </div>
@@ -1081,7 +1246,7 @@ const EmployeeAttendance = () => {
                   }}>
                     {filteredDays.map((day, index) => (
                       <div key={index} style={{
-                        border: `2px solid ${getStatusColor(day.status)}`,
+                        border: `2px solid ${getStatusColor(day.status, day.notes)}`,
                         borderRadius: '0.75rem',
                         padding: '1rem',
                         background: 'white',
@@ -1105,16 +1270,16 @@ const EmployeeAttendance = () => {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.5rem',
-                            color: getStatusColor(day.status)
+                            color: getStatusColor(day.status, day.notes)
                           }}>
-                            {getStatusIcon(day.status)}
+                            {getStatusIcon(day.status, day.notes)}
                             <span style={{ fontSize: '0.875rem', fontWeight: '500', textTransform: 'capitalize' }}>
-                              {day.status}
+                              {day.notes === 'Comp Off' ? 'Comp Off' : day.status}
                             </span>
                           </div>
                         </div>
                         
-                        {day.status !== 'weekend' && (
+                        {(day.status !== 'weekend' || day.notes === 'Comp Off') && (
                           <div style={{
                             display: 'grid',
                             gridTemplateColumns: '1fr 1fr',
@@ -1135,7 +1300,7 @@ const EmployeeAttendance = () => {
                             </div>
                             <div>
                               <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Total Hours</div>
-                              <div style={{ fontWeight: '500', color: getStatusColor(day.status) }}>
+                              <div style={{ fontWeight: '500', color: getStatusColor(day.status, day.notes) }}>
                                 {day.totalHours}
                               </div>
                             </div>

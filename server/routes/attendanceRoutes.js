@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Attendance = require("../models/Attendance");
 const Employee = require("../models/Employee");
+const WorkingSaturday = require("../models/WorkingSaturday");
 const mongoose = require("mongoose");
 
 // Simplified helper function to find employee - direct approach
@@ -157,6 +158,29 @@ router.post("/checkin", async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
+    // Check if today is a weekend day
+    const dayOfWeek = today.getDay();
+    const isSaturday = dayOfWeek === 6;
+    const isSunday = dayOfWeek === 0;
+    let isCompOff = false;
+    
+    // Check if it's a weekend (Sunday or non-working Saturday)
+    if (isSunday) {
+      // Sunday is always a weekend - allow check-in but mark as comp off
+      isCompOff = true;
+    } else if (isSaturday) {
+      // Check if it's a working Saturday
+      const workingSaturday = await WorkingSaturday.findOne({ 
+        date: today, 
+        isWorking: true 
+      });
+      
+      if (!workingSaturday) {
+        // Non-working Saturday - allow check-in but mark as comp off
+        isCompOff = true;
+      }
+    }
+    
     // Check if employee already has a check-in for today
     let attendanceRecord = await Attendance.findOne({
       employeeId: employee._id,
@@ -176,8 +200,9 @@ router.post("/checkin", async (req, res) => {
       employeeId: employee._id,
       date: today,
       inTime: new Date(),
-      status: "Present",
-      location: location || "Office"
+      status: isCompOff ? "CompOff" : "Present",
+      location: location || "Office",
+      compOff: isCompOff
     });
     
     await attendanceRecord.save();

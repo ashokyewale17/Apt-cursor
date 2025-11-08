@@ -8,7 +8,7 @@ import {
   Filter, Search, Plus, ArrowUpRight, ArrowDownRight, Eye, Edit, Trash2,
   MapPin, Phone, Mail, Star, Briefcase, UserPlus, GitBranch, PieChart, TrendingDown, Edit3, X
 } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, isToday, isThisWeek } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, isToday, isThisWeek, startOfWeek, endOfWeek } from 'date-fns';
 
 
 // Add pulse animation styles
@@ -79,6 +79,11 @@ const AdminDashboard = () => {
     theme: 'light'
   });
   const [viewMode, setViewMode] = useState('table'); // Add viewMode state - default to 'table'
+  const [showWorkingSaturdaysModal, setShowWorkingSaturdaysModal] = useState(false);
+  const [workingSaturdays, setWorkingSaturdays] = useState([]);
+  const [selectedSaturdayDate, setSelectedSaturdayDate] = useState('');
+  const [saturdayNotes, setSaturdayNotes] = useState('');
+  const [loadingWorkingSaturdays, setLoadingWorkingSaturdays] = useState(false);
 
   // Function to update employee status from database records
   const updateEmployeeStatusFromDatabase = useCallback((attendanceRecords) => {
@@ -1149,6 +1154,114 @@ const AdminDashboard = () => {
   }, [checkForEmployeeCheckIns]);
 
 
+
+  // Load working Saturdays
+  const loadWorkingSaturdays = async () => {
+    setLoadingWorkingSaturdays(true);
+    try {
+      const token = localStorage.getItem('token');
+      const today = new Date();
+      const startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1); // 2 months back
+      const endDate = new Date(today.getFullYear(), today.getMonth() + 3, 0); // 3 months forward
+      
+      const startDateStr = format(startDate, 'yyyy-MM-dd');
+      const endDateStr = format(endDate, 'yyyy-MM-dd');
+      
+      const response = await fetch(
+        `/api/working-saturdays?startDate=${startDateStr}&endDate=${endDateStr}`,
+        {
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : undefined
+          }
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setWorkingSaturdays(data);
+      } else {
+        console.error('Failed to load working Saturdays');
+        setWorkingSaturdays([]);
+      }
+    } catch (error) {
+      console.error('Error loading working Saturdays:', error);
+      setWorkingSaturdays([]);
+    } finally {
+      setLoadingWorkingSaturdays(false);
+    }
+  };
+
+  // Add working Saturday
+  const addWorkingSaturday = async () => {
+    if (!selectedSaturdayDate) {
+      alert('Please select a Saturday date');
+      return;
+    }
+    
+    const selectedDate = new Date(selectedSaturdayDate);
+    if (selectedDate.getDay() !== 6) {
+      alert('Please select a Saturday');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/working-saturdays', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : undefined
+        },
+        body: JSON.stringify({
+          date: selectedSaturdayDate,
+          notes: saturdayNotes
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert('Working Saturday added successfully');
+        setSelectedSaturdayDate('');
+        setSaturdayNotes('');
+        await loadWorkingSaturdays();
+      } else {
+        alert(data.error || 'Failed to add working Saturday');
+      }
+    } catch (error) {
+      console.error('Error adding working Saturday:', error);
+      alert('Failed to add working Saturday');
+    }
+  };
+
+  // Remove working Saturday
+  const removeWorkingSaturday = async (date) => {
+    if (!confirm('Are you sure you want to remove this working Saturday?')) {
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/working-saturdays/${date}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : undefined
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert('Working Saturday removed successfully');
+        await loadWorkingSaturdays();
+      } else {
+        alert(data.error || 'Failed to remove working Saturday');
+      }
+    } catch (error) {
+      console.error('Error removing working Saturday:', error);
+      alert('Failed to remove working Saturday');
+    }
+  };
 
   const refreshData = async () => {
     setIsRefreshing(true);
@@ -2558,6 +2671,29 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
+              {/* Working Saturdays Management */}
+              <div className="card">
+                <div className="card-header">
+                  <h3 className="card-title">Working Saturdays</h3>
+                </div>
+                <div className="card-body">
+                  <p style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>
+                    Manage specific Saturdays as working days. Employees will be able to check in/out on these days.
+                  </p>
+                  <button 
+                    onClick={() => {
+                      setShowWorkingSaturdaysModal(true);
+                      loadWorkingSaturdays();
+                    }}
+                    className="btn btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    <Calendar size={16} />
+                    Manage Working Saturdays
+                  </button>
+                </div>
+              </div>
+
               {/* Working Hours */}
               <div className="card">
                 <div className="card-header">
@@ -2731,6 +2867,194 @@ const AdminDashboard = () => {
                   Save Settings
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Working Saturdays Management Modal */}
+      {showWorkingSaturdaysModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '0.75rem',
+            padding: '2rem',
+            width: '90%',
+            maxWidth: '900px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Calendar size={24} />
+                Manage Working Saturdays
+              </h2>
+              <button 
+                onClick={() => setShowWorkingSaturdaysModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            {/* Add Working Saturday Form */}
+            <div className="card" style={{ marginBottom: '2rem' }}>
+              <div className="card-header">
+                <h3 className="card-title">Add Working Saturday</h3>
+              </div>
+              <div className="card-body">
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                      Select Saturday Date
+                    </label>
+                    <input 
+                      type="date" 
+                      value={selectedSaturdayDate}
+                      onChange={(e) => {
+                        const date = new Date(e.target.value);
+                        // Validate it's a Saturday
+                        if (date.getDay() !== 6) {
+                          alert('Please select a Saturday');
+                          return;
+                        }
+                        setSelectedSaturdayDate(e.target.value);
+                      }}
+                      style={{ 
+                        width: '100%', 
+                        padding: '0.5rem', 
+                        borderRadius: '0.375rem', 
+                        border: '1px solid var(--border-color)',
+                        backgroundColor: 'white',
+                        color: 'black'
+                      }}
+                    />
+                    <small style={{ color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'block' }}>
+                      Only Saturdays can be selected as working days
+                    </small>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                      Notes (Optional)
+                    </label>
+                    <textarea
+                      value={saturdayNotes}
+                      onChange={(e) => setSaturdayNotes(e.target.value)}
+                      placeholder="Add any notes about this working Saturday..."
+                      rows="2"
+                      style={{ 
+                        width: '100%', 
+                        padding: '0.5rem', 
+                        borderRadius: '0.375rem', 
+                        border: '1px solid var(--border-color)',
+                        backgroundColor: 'white',
+                        color: 'black',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+                  <button 
+                    onClick={addWorkingSaturday}
+                    className="btn btn-primary"
+                    style={{ alignSelf: 'flex-start' }}
+                  >
+                    <Plus size={16} style={{ marginRight: '0.5rem' }} />
+                    Add Working Saturday
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* List of Working Saturdays */}
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Current Working Saturdays</h3>
+              </div>
+              <div className="card-body">
+                {loadingWorkingSaturdays ? (
+                  <div style={{ textAlign: 'center', padding: '2rem' }}>
+                    <div>Loading...</div>
+                  </div>
+                ) : workingSaturdays.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                    <Calendar size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                    <p>No working Saturdays configured</p>
+                    <p style={{ fontSize: '0.875rem' }}>Add working Saturdays using the form above</p>
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>Date</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>Day</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>Notes</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '600' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {workingSaturdays
+                          .filter(ws => ws.isWorking)
+                          .sort((a, b) => new Date(a.date) - new Date(b.date))
+                          .map((ws) => {
+                            const date = new Date(ws.date);
+                            return (
+                              <tr key={ws._id || ws.date} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                <td style={{ padding: '0.75rem' }}>
+                                  {format(date, 'MMM dd, yyyy')}
+                                </td>
+                                <td style={{ padding: '0.75rem' }}>
+                                  {format(date, 'EEEE')}
+                                </td>
+                                <td style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>
+                                  {ws.notes || '-'}
+                                </td>
+                                <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                                  <button
+                                    onClick={() => removeWorkingSaturday(format(date, 'yyyy-MM-dd'))}
+                                    className="btn btn-sm btn-danger"
+                                    style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem' }}
+                                  >
+                                    <Trash2 size={12} style={{ marginRight: '0.25rem' }} />
+                                    Remove
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
+              <button 
+                onClick={() => setShowWorkingSaturdaysModal(false)}
+                className="btn btn-outline"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

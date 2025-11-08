@@ -18,12 +18,16 @@ const attendanceSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["Present", "Absent", "Leave", "Holiday"],
+    enum: ["Present", "Absent", "Leave", "Holiday", "CompOff"],
     default: "Present"
   },
   location: {
     type: String,
     default: "Office"
+  },
+  compOff: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true // Add createdAt and updatedAt fields
