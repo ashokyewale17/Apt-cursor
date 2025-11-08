@@ -61,6 +61,11 @@ const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const updateUser = (userData) => {
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData);
+  };
+
   const addNotification = (notification) => {
     const newNotification = {
       id: Date.now(),
@@ -93,7 +98,8 @@ const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{ 
       user, 
       login, 
-      logout, 
+      logout,
+      updateUser,
       isAuthenticated: !!user,
       notifications,
       addNotification,

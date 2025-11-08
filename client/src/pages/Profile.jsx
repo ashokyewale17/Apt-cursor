@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
 import { User, Mail, Phone, MapPin, Calendar, Edit, Save, X, Shield, Clock, Eye, EyeOff, Smartphone, Key, History, CheckCircle } from 'lucide-react';
 
 const Profile = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [profileData, setProfileData] = useState({
-    name: user.name,
-    email: user.email,
-    phone: '+1 (555) 123-4567',
-    address: '123 Main St, Anytown, ST 12345',
-    joinDate: '2023-01-15',
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    address: user?.address || '',
+    dateOfJoining: user?.dateOfJoining || new Date(),
     ...user
   });
   const [tempProfileData, setTempProfileData] = useState({ ...profileData });
@@ -22,20 +25,135 @@ const Profile = () => {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
+  // Fetch profile data from database
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch profile');
+        }
+
+        const data = await response.json();
+        const userData = data.user;
+        
+        setProfileData({
+          name: userData.name || '',
+          email: userData.email || '',
+          phone: userData.phone || '',
+          address: userData.address || '',
+          dateOfJoining: userData.dateOfJoining || new Date(),
+          position: userData.position || '',
+          department: userData.department || '',
+          role: userData.role || 'employee',
+          _id: userData._id
+        });
+        
+        setTempProfileData({
+          name: userData.name || '',
+          email: userData.email || '',
+          phone: userData.phone || '',
+          address: userData.address || '',
+          dateOfJoining: userData.dateOfJoining || new Date(),
+          position: userData.position || '',
+          department: userData.department || '',
+          role: userData.role || 'employee',
+          _id: userData._id
+        });
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+        setError('Failed to load profile data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchProfile();
+    }
+  }, [user]);
+
   const handleEdit = () => {
     setIsEditing(true);
     setTempProfileData({ ...profileData });
+    setError('');
   };
 
-  const handleSave = () => {
-    setProfileData({ ...tempProfileData });
-    setIsEditing(false);
-    alert('Profile updated successfully!');
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setError('');
+      
+      const token = localStorage.getItem('token');
+      // Use _id from profileData which comes from the database
+      const userId = profileData._id || user._id || user.id;
+      
+      if (!userId) {
+        setError('User ID not found');
+        setSaving(false);
+        return;
+      }
+      
+      const response = await fetch(`/api/employees/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: tempProfileData.name,
+          email: tempProfileData.email,
+          phone: tempProfileData.phone,
+          address: tempProfileData.address
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update profile');
+      }
+
+      const updatedEmployee = await response.json();
+      
+      // Update local state
+      setProfileData({
+        ...profileData,
+        name: updatedEmployee.name,
+        email: updatedEmployee.email,
+        phone: updatedEmployee.phone,
+        address: updatedEmployee.address
+      });
+      
+      // Update auth context
+      updateUser({
+        ...user,
+        name: updatedEmployee.name,
+        email: updatedEmployee.email,
+        phone: updatedEmployee.phone,
+        address: updatedEmployee.address
+      });
+      
+      setIsEditing(false);
+      alert('Profile updated successfully!');
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      setError(err.message || 'Failed to update profile. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
     setTempProfileData({ ...profileData });
     setIsEditing(false);
+    setError('');
   };
 
   const handleInputChange = (field, value) => {
@@ -43,14 +161,42 @@ const Profile = () => {
   };
 
   // Security functions
-  const handlePasswordChange = () => {
+  const handlePasswordChange = async () => {
     if (!passwordData.currentPassword || !passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword) {
       alert('Please check your password fields');
       return;
     }
-    alert('Password changed successfully!');
-    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    setShowChangePassword(false);
+
+    if (passwordData.newPassword.length < 6) {
+      alert('Password must be at least 6 characters long');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to change password');
+      }
+
+      alert('Password changed successfully!');
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setShowChangePassword(false);
+    } catch (err) {
+      alert(err.message || 'Failed to change password. Please try again.');
+    }
   };
   
   const toggleTwoFactor = () => {
@@ -59,8 +205,55 @@ const Profile = () => {
     setShowTwoFactor(false);
   };
 
+  // Format date for display
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    const d = new Date(date);
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
+  if (loading) {
+    return (
+      <div style={{ padding: '1.5rem', background: 'var(--background-alt)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Loading profile...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: '1.5rem', background: 'var(--background-alt)', minHeight: '100vh' }}>
+      {/* Error Message */}
+      {error && (
+        <div style={{
+          padding: '1rem',
+          background: '#fee2e2',
+          border: '1px solid #ef4444',
+          borderRadius: '8px',
+          color: '#dc2626',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span>{error}</span>
+          <button
+            onClick={() => setError('')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#dc2626',
+              cursor: 'pointer',
+              fontSize: '1.25rem',
+              padding: '0 0.5rem'
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Modern Profile Header */}
       <div className="card" style={{ 
         marginBottom: '2rem', 
@@ -140,7 +333,7 @@ const Profile = () => {
               
               <p style={{ color: 'rgba(255,255,255,0.8)', margin: 0, fontSize: '1rem' }}>
                 <Clock size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
-                Joined on January 15, 2023
+                Joined on {formatDate(profileData.dateOfJoining)}
               </p>
             </div>
             
@@ -164,25 +357,31 @@ const Profile = () => {
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button 
                     onClick={handleSave} 
+                    disabled={saving}
                     className="btn"
                     style={{
-                      background: 'rgba(16, 185, 129, 0.2)',
+                      background: saving ? 'rgba(107, 114, 128, 0.2)' : 'rgba(16, 185, 129, 0.2)',
                       color: 'white',
-                      border: '1px solid rgba(16, 185, 129, 0.3)',
-                      backdropFilter: 'blur(10px)'
+                      border: `1px solid ${saving ? 'rgba(107, 114, 128, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                      backdropFilter: 'blur(10px)',
+                      cursor: saving ? 'not-allowed' : 'pointer',
+                      opacity: saving ? 0.6 : 1
                     }}
                   >
                     <Save size={16} />
-                    Save
+                    {saving ? 'Saving...' : 'Save'}
                   </button>
                   <button 
-                    onClick={handleCancel} 
+                    onClick={handleCancel}
+                    disabled={saving}
                     className="btn"
                     style={{
                       background: 'rgba(255,255,255,0.1)',
                       color: 'white',
                       border: '1px solid rgba(255,255,255,0.2)',
-                      backdropFilter: 'blur(10px)'
+                      backdropFilter: 'blur(10px)',
+                      cursor: saving ? 'not-allowed' : 'pointer',
+                      opacity: saving ? 0.6 : 1
                     }}
                   >
                     <X size={16} />
@@ -457,7 +656,7 @@ const Profile = () => {
                   color: '#0369a1',
                   letterSpacing: '0.1em'
                 }}>
-                  EMP-{user.id.padStart(4, '0')}
+                  EMP-{(user._id || user.id || '').toString().slice(-4).padStart(4, '0')}
                 </p>
               </div>
 
@@ -530,7 +729,7 @@ const Profile = () => {
                   fontSize: '1.1rem',
                   color: 'var(--text-primary)'
                 }}>
-                  January 15, 2023
+                  {formatDate(profileData.dateOfJoining)}
                 </p>
               </div>
 
