@@ -10,7 +10,7 @@ const AttendanceEditRequests = () => {
   const { user } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState('pending');
+  const [filter, setFilter] = useState('all'); // Changed to 'all' to show all requests by default
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {

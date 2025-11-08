@@ -64,28 +64,43 @@ router.post("/edit-request", authenticateToken, async (req, res) => {
       return null;
     };
 
+    // Parse date string (yyyy-MM-dd) and create date at midnight in local timezone
+    // This matches how attendance.date is stored
+    const dateParts = date.split('-');
+    const requestDate = new Date(
+      parseInt(dateParts[0]), // year
+      parseInt(dateParts[1]) - 1, // month (0-indexed)
+      parseInt(dateParts[2]) // day
+    );
+    requestDate.setHours(0, 0, 0, 0); // Ensure it's at midnight
+    
     // Create edit request
     const editRequest = new AttendanceEditRequest({
       employeeId,
       attendanceId,
-      date: new Date(date),
+      date: requestDate,
       originalInTime: formatTimeForStorage(attendance.inTime),
       originalOutTime: formatTimeForStorage(attendance.outTime),
       requestedInTime: inTime,
       requestedOutTime: outTime,
-      reason
+      reason,
+      status: "pending" // Explicitly set status
     });
 
     await editRequest.save();
-
+    
+    // Reload from database to see what was actually saved
+    const savedRequest = await AttendanceEditRequest.findById(editRequest._id);
     console.log('✅ Edit request created successfully:', {
-      id: editRequest._id,
-      employeeId: editRequest.employeeId,
-      attendanceId: editRequest.attendanceId,
-      date: editRequest.date,
-      requestedInTime: editRequest.requestedInTime,
-      requestedOutTime: editRequest.requestedOutTime,
-      status: editRequest.status
+      id: savedRequest._id,
+      employeeId: savedRequest.employeeId.toString(),
+      attendanceId: savedRequest.attendanceId.toString(),
+      date: savedRequest.date,
+      dateISO: savedRequest.date.toISOString(),
+      requestedInTime: savedRequest.requestedInTime,
+      requestedOutTime: savedRequest.requestedOutTime,
+      status: savedRequest.status,
+      createdAt: savedRequest.createdAt
     });
 
     res.status(201).json({
@@ -140,6 +155,7 @@ router.get("/edit-requests/pending", authenticateToken, async (req, res) => {
 router.get("/edit-requests", authenticateToken, async (req, res) => {
   try {
     console.log('🔍 GET /edit-requests - User ID:', req.user.id);
+    console.log('🔍 Query params:', req.query);
     
     // Check if user is admin
     const employee = await Employee.findById(req.user.id);
@@ -149,6 +165,8 @@ router.get("/edit-requests", authenticateToken, async (req, res) => {
         message: "Employee not found" 
       });
     }
+    
+    console.log('✅ Employee found:', { id: employee._id, name: employee.name, role: employee.role });
     
     if (employee.role !== "admin") {
       console.error('❌ Access denied - User is not admin. Role:', employee.role);
@@ -160,7 +178,24 @@ router.get("/edit-requests", authenticateToken, async (req, res) => {
     const { status } = req.query;
     const query = status && status !== 'all' ? { status } : {};
     
-    console.log('🔍 Query for edit requests:', query);
+    console.log('🔍 Query for edit requests:', JSON.stringify(query));
+    
+    // First, check total count without query
+    const totalCount = await AttendanceEditRequest.countDocuments({});
+    console.log(`📊 Total edit requests in database: ${totalCount}`);
+    
+    // Check count with query
+    const queryCount = await AttendanceEditRequest.countDocuments(query);
+    console.log(`📊 Edit requests matching query: ${queryCount}`);
+    
+    // Get all requests to see what we have
+    const allRequests = await AttendanceEditRequest.find({}).select('status employeeId date').lean();
+    console.log('📋 All requests in database:', allRequests.map(r => ({
+      id: r._id,
+      employeeId: r.employeeId,
+      status: r.status,
+      date: r.date
+    })));
     
     const requests = await AttendanceEditRequest.find(query)
       .sort({ createdAt: -1 })
@@ -168,18 +203,20 @@ router.get("/edit-requests", authenticateToken, async (req, res) => {
       .populate("attendanceId", "inTime outTime date")
       .populate("reviewedBy", "name");
 
-    console.log(`✅ Found ${requests.length} edit requests in database`);
-    console.log('📋 Requests:', requests.map(r => ({
+    console.log(`✅ Found ${requests.length} edit requests matching query`);
+    console.log('📋 Populated requests:', requests.map(r => ({
       id: r._id,
       employeeId: r.employeeId?._id || r.employeeId,
       employeeName: r.employeeId?.name || 'Unknown',
       status: r.status,
-      date: r.date
+      date: r.date,
+      hasAttendanceId: !!r.attendanceId
     })));
 
     res.json(requests);
   } catch (error) {
     console.error('❌ Error in GET /edit-requests:', error);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
