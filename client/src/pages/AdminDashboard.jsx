@@ -663,13 +663,6 @@ const AdminDashboard = () => {
     }
   }, [realEmployees, selectedMonth, selectedYear]);
 
-  // Reset viewMode to 'table' whenever the attendance modal opens
-  useEffect(() => {
-    if (showAttendanceModal) {
-      setViewMode('table');
-    }
-  }, [showAttendanceModal]);
-
   const generateAnalyticsData = () => {
     const currentDate = new Date();
     const last7Days = Array.from({ length: 7 }, (_, i) => {
