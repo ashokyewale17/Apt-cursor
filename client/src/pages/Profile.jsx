@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
-import { User, Mail, Phone, MapPin, Calendar, Edit, Save, X, Shield, Clock, Eye, EyeOff, Smartphone, Key, History, CheckCircle } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Edit, Save, X, Shield, Clock, Eye, EyeOff, Smartphone, Key, History, CheckCircle, BarChart3, Users, FileText } from 'lucide-react';
 
 const Profile = () => {
   const { user, logout, updateUser } = useAuth();
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -24,6 +26,10 @@ const Profile = () => {
   const [showLoginHistory, setShowLoginHistory] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [passwordErrors, setPasswordErrors] = useState({});
+  const [showPasswords, setShowPasswords] = useState({ current: false, new: false, confirm: false });
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   // Fetch profile data from database
   useEffect(() => {
@@ -160,19 +166,89 @@ const Profile = () => {
     setTempProfileData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Validate password
+  const validatePassword = (password) => {
+    const errors = {};
+    
+    if (!password) {
+      errors.empty = true;
+      return errors;
+    }
+    
+    if (password.length < 6) {
+      errors.minLength = 'Password must be at least 6 characters long';
+    }
+    
+    if (password.length > 100) {
+      errors.maxLength = 'Password cannot exceed 100 characters';
+    }
+    
+    return errors;
+  };
+
+  // Get password strength
+  const getPasswordStrength = (password) => {
+    if (!password) return { strength: 0, label: '', color: '' };
+    
+    let strength = 0;
+    if (password.length >= 6) strength++;
+    if (password.length >= 8) strength++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+    if (/\d/.test(password)) strength++;
+    if (/[^a-zA-Z\d]/.test(password)) strength++;
+    
+    const strengths = [
+      { strength: 0, label: 'Very Weak', color: '#ef4444' },
+      { strength: 1, label: 'Weak', color: '#f59e0b' },
+      { strength: 2, label: 'Fair', color: '#eab308' },
+      { strength: 3, label: 'Good', color: '#10b981' },
+      { strength: 4, label: 'Strong', color: '#059669' },
+      { strength: 5, label: 'Very Strong', color: '#047857' }
+    ];
+    
+    return strengths[Math.min(strength, 5)] || strengths[0];
+  };
+
   // Security functions
   const handlePasswordChange = async () => {
-    if (!passwordData.currentPassword || !passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword) {
-      alert('Please check your password fields');
-      return;
+    setPasswordErrors({});
+    setPasswordSuccess(false);
+    
+    // Validate inputs
+    const errors = {};
+    
+    if (!passwordData.currentPassword) {
+      errors.currentPassword = 'Current password is required';
     }
-
-    if (passwordData.newPassword.length < 6) {
-      alert('Password must be at least 6 characters long');
+    
+    if (!passwordData.newPassword) {
+      errors.newPassword = 'New password is required';
+    } else {
+      const passwordValidation = validatePassword(passwordData.newPassword);
+      if (passwordValidation.minLength) {
+        errors.newPassword = passwordValidation.minLength;
+      } else if (passwordValidation.maxLength) {
+        errors.newPassword = passwordValidation.maxLength;
+      }
+    }
+    
+    if (!passwordData.confirmPassword) {
+      errors.confirmPassword = 'Please confirm your new password';
+    } else if (passwordData.newPassword !== passwordData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+    
+    if (passwordData.currentPassword === passwordData.newPassword) {
+      errors.newPassword = 'New password must be different from current password';
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setPasswordErrors(errors);
       return;
     }
 
     try {
+      setChangingPassword(true);
       const token = localStorage.getItem('token');
       const response = await fetch('/api/auth/change-password', {
         method: 'POST',
@@ -191,12 +267,32 @@ const Profile = () => {
         throw new Error(errorData.message || 'Failed to change password');
       }
 
-      alert('Password changed successfully!');
+      setPasswordSuccess(true);
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setShowChangePassword(false);
+      setPasswordErrors({});
+      
+      // Close modal after 2 seconds
+      setTimeout(() => {
+        setShowChangePassword(false);
+        setPasswordSuccess(false);
+      }, 2000);
     } catch (err) {
-      alert(err.message || 'Failed to change password. Please try again.');
+      if (err.message.includes('Current password is incorrect')) {
+        setPasswordErrors({ currentPassword: err.message });
+      } else {
+        setPasswordErrors({ general: err.message || 'Failed to change password. Please try again.' });
+      }
+    } finally {
+      setChangingPassword(false);
     }
+  };
+
+  const handleClosePasswordModal = () => {
+    setShowChangePassword(false);
+    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    setPasswordErrors({});
+    setShowPasswords({ current: false, new: false, confirm: false });
+    setPasswordSuccess(false);
   };
   
   const toggleTwoFactor = () => {
@@ -769,150 +865,6 @@ const Profile = () => {
         </div>
       </div>
 
-      {/* Modern Activity Summary */}
-      <div className="card" style={{
-        marginTop: '2rem',
-        border: '1px solid var(--border-color)',
-        borderRadius: '16px',
-        overflow: 'hidden'
-      }}>
-        <div className="card-header" style={{
-          background: 'linear-gradient(135deg, #f8fafc, #e2e8f0)',
-          borderBottom: '1px solid var(--border-color)',
-          padding: '1.5rem 2rem'
-        }}>
-          <h3 className="card-title" style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            fontSize: '1.25rem',
-            fontWeight: '600',
-            margin: 0
-          }}>
-            <div style={{
-              padding: '0.5rem',
-              background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
-              borderRadius: '8px',
-              color: 'white'
-            }}>
-              📊
-            </div>
-            Activity Summary
-          </h3>
-        </div>
-        <div className="card-body" style={{ padding: '2rem' }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '1.5rem'
-          }}>
-            <div style={{
-              padding: '2rem',
-              background: 'linear-gradient(135deg, #fef3c7, #fbbf24)',
-              borderRadius: '16px',
-              border: '1px solid #f59e0b',
-              textAlign: 'center',
-              transition: 'transform 0.2s ease',
-              cursor: 'pointer'
-            }}
-            onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
-            onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}>
-              <div style={{
-                fontSize: '2.5rem',
-                fontWeight: '800',
-                color: '#92400e',
-                marginBottom: '0.5rem'
-              }}>156</div>
-              <div style={{
-                fontSize: '1rem',
-                fontWeight: '600',
-                color: '#92400e',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>Days Worked</div>
-            </div>
-            
-            <div style={{
-              padding: '2rem',
-              background: 'linear-gradient(135deg, #ddd6fe, #8b5cf6)',
-              borderRadius: '16px',
-              border: '1px solid #7c3aed',
-              textAlign: 'center',
-              transition: 'transform 0.2s ease',
-              cursor: 'pointer'
-            }}
-            onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
-            onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}>
-              <div style={{
-                fontSize: '2.5rem',
-                fontWeight: '800',
-                color: '#581c87',
-                marginBottom: '0.5rem'
-              }}>1,248h</div>
-              <div style={{
-                fontSize: '1rem',
-                fontWeight: '600',
-                color: '#581c87',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>Total Hours</div>
-            </div>
-            
-            <div style={{
-              padding: '2rem',
-              background: 'linear-gradient(135deg, #fed7d7, #f56565)',
-              borderRadius: '16px',
-              border: '1px solid #e53e3e',
-              textAlign: 'center',
-              transition: 'transform 0.2s ease',
-              cursor: 'pointer'
-            }}
-            onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
-            onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}>
-              <div style={{
-                fontSize: '2.5rem',
-                fontWeight: '800',
-                color: '#9b2c2c',
-                marginBottom: '0.5rem'
-              }}>8</div>
-              <div style={{
-                fontSize: '1rem',
-                fontWeight: '600',
-                color: '#9b2c2c',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>Leaves Taken</div>
-            </div>
-            
-            <div style={{
-              padding: '2rem',
-              background: 'linear-gradient(135deg, #c6f6d5, #48bb78)',
-              borderRadius: '16px',
-              border: '1px solid #38a169',
-              textAlign: 'center',
-              transition: 'transform 0.2s ease',
-              cursor: 'pointer'
-            }}
-            onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
-            onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}>
-              <div style={{
-                fontSize: '2.5rem',
-                fontWeight: '800',
-                color: '#2f855a',
-                marginBottom: '0.5rem'
-              }}>97.2%</div>
-              <div style={{
-                fontSize: '1rem',
-                fontWeight: '600',
-                color: '#2f855a',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>Attendance Rate</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Modern Quick Actions */}
       <div className="card" style={{
         marginTop: '2rem',
@@ -950,8 +902,9 @@ const Profile = () => {
             gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
             gap: '1.5rem'
           }}>
+            {/* Go to Dashboard */}
             <button 
-              onClick={() => window.location.href = user.role === 'admin' ? '/admin-dashboard' : '/employee-dashboard'}
+              onClick={() => navigate(user.role === 'admin' ? '/admin-dashboard' : '/employee-dashboard')}
               style={{
                 padding: '1.5rem',
                 background: 'linear-gradient(135deg, var(--primary-color), #6366f1)',
@@ -981,8 +934,9 @@ const Profile = () => {
               Go to Dashboard
             </button>
             
+            {/* Manage Leaves */}
             <button 
-              onClick={() => window.location.href = '/leave-management'}
+              onClick={() => navigate('/leave-management')}
               style={{
                 padding: '1.5rem',
                 background: 'linear-gradient(135deg, #10b981, #059669)',
@@ -1011,13 +965,14 @@ const Profile = () => {
               <Calendar size={20} />
               Manage Leaves
             </button>
-            
-            {user.role === 'admin' && (
+
+            {/* View Attendance - For Employees */}
+            {user.role === 'employee' && (
               <button 
-                onClick={() => window.location.href = '/attendance-report'}
+                onClick={() => navigate('/attendance')}
                 style={{
                   padding: '1.5rem',
-                  background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                  background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '12px',
@@ -1040,14 +995,115 @@ const Profile = () => {
                   e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
                 }}
               >
-                📊 View Reports
+                <FileText size={20} />
+                View Attendance
               </button>
             )}
             
+            {/* Admin Only Actions */}
+            {user.role === 'admin' && (
+              <>
+                <button 
+                  onClick={() => navigate('/attendance-report')}
+                  style={{
+                    padding: '1.5rem',
+                    background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.75rem',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.transform = 'translateY(-2px)';
+                    e.target.style.boxShadow = '0 8px 25px -8px rgba(0, 0, 0, 0.25)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+                  }}
+                >
+                  <BarChart3 size={20} />
+                  View Reports
+                </button>
+
+                <button 
+                  onClick={() => navigate('/add-employee')}
+                  style={{
+                    padding: '1.5rem',
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.75rem',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.transform = 'translateY(-2px)';
+                    e.target.style.boxShadow = '0 8px 25px -8px rgba(0, 0, 0, 0.25)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+                  }}
+                >
+                  <Users size={20} />
+                  Add Employee
+                </button>
+
+                <button 
+                  onClick={() => navigate('/attendance-edit-requests')}
+                  style={{
+                    padding: '1.5rem',
+                    background: 'linear-gradient(135deg, #ec4899, #db2777)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.75rem',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.transform = 'translateY(-2px)';
+                    e.target.style.boxShadow = '0 8px 25px -8px rgba(0, 0, 0, 0.25)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+                  }}
+                >
+                  <FileText size={20} />
+                  Edit Requests
+                </button>
+              </>
+            )}
+            
+            {/* Logout */}
             <button 
               onClick={() => {
                 if (confirm('Are you sure you want to logout?')) {
                   logout();
+                  navigate('/login');
                 }
               }}
               style={{
@@ -1075,7 +1131,8 @@ const Profile = () => {
                 e.target.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
               }}
             >
-              🚪 Logout
+              <X size={20} />
+              Logout
             </button>
           </div>
         </div>
@@ -1310,46 +1367,401 @@ const Profile = () => {
       
       {/* Security Modals */}
       {showChangePassword && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-        }}>
-          <div style={{ background: 'white', borderRadius: '16px', padding: '2rem', width: '90%', maxWidth: '500px' }}>
-            <h3 style={{ margin: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Key size={20} /> Change Password
-            </h3>
-            <div style={{ display: 'grid', gap: '1rem' }}>
-              <input type="password" placeholder="Current Password" value={passwordData.currentPassword}
-                onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                style={{ 
-                  padding: '0.75rem', 
-                  border: '2px solid #e2e8f0', 
+        <div 
+          style={{
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            zIndex: 1000,
+            backdropFilter: 'blur(4px)'
+          }}
+          onClick={handleClosePasswordModal}
+        >
+          <div 
+            style={{ 
+              background: 'white', 
+              borderRadius: '16px', 
+              padding: '2rem', 
+              width: '90%', 
+              maxWidth: '500px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.5rem', fontWeight: '600' }}>
+                <Key size={24} style={{ color: 'var(--primary-color)' }} /> Change Password
+              </h3>
+              <button
+                onClick={handleClosePasswordModal}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
                   borderRadius: '8px',
-                  backgroundColor: 'white',
-                  color: 'black'
-                }} />
-              <input type="password" placeholder="New Password" value={passwordData.newPassword}
-                onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                style={{ 
-                  padding: '0.75rem', 
-                  border: '2px solid #e2e8f0', 
-                  borderRadius: '8px',
-                  backgroundColor: 'white',
-                  color: 'black'
-                }} />
-              <input type="password" placeholder="Confirm Password" value={passwordData.confirmPassword}
-                onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                style={{ 
-                  padding: '0.75rem', 
-                  border: '2px solid #e2e8f0', 
-                  borderRadius: '8px',
-                  backgroundColor: 'white',
-                  color: 'black'
-                }} />
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6b7280',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#f3f4f6';
+                  e.target.style.color = '#374151';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'none';
+                  e.target.style.color = '#6b7280';
+                }}
+              >
+                <X size={20} />
+              </button>
             </div>
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowChangePassword(false)} className="btn btn-outline">Cancel</button>
-              <button onClick={handlePasswordChange} className="btn btn-primary">Change Password</button>
+
+            {passwordSuccess && (
+              <div style={{
+                padding: '1rem',
+                background: '#d1fae5',
+                border: '1px solid #10b981',
+                borderRadius: '8px',
+                color: '#047857',
+                marginBottom: '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <CheckCircle size={20} />
+                <span>Password changed successfully! Closing...</span>
+              </div>
+            )}
+
+            {passwordErrors.general && (
+              <div style={{
+                padding: '1rem',
+                background: '#fee2e2',
+                border: '1px solid #ef4444',
+                borderRadius: '8px',
+                color: '#dc2626',
+                marginBottom: '1.5rem'
+              }}>
+                {passwordErrors.general}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gap: '1.5rem' }}>
+              {/* Current Password */}
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '0.5rem', 
+                  fontWeight: '600',
+                  color: '#374151',
+                  fontSize: '0.875rem'
+                }}>
+                  Current Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type={showPasswords.current ? 'text' : 'password'}
+                    placeholder="Enter your current password"
+                    value={passwordData.currentPassword}
+                    onChange={(e) => {
+                      setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }));
+                      if (passwordErrors.currentPassword) {
+                        setPasswordErrors(prev => ({ ...prev, currentPassword: null }));
+                      }
+                    }}
+                    style={{ 
+                      padding: '0.875rem 3rem 0.875rem 1rem', 
+                      border: `2px solid ${passwordErrors.currentPassword ? '#ef4444' : '#e5e7eb'}`, 
+                      borderRadius: '8px',
+                      backgroundColor: 'white',
+                      color: '#111827',
+                      width: '100%',
+                      fontSize: '1rem',
+                      transition: 'border-color 0.2s ease',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#6366f1'}
+                    onBlur={(e) => e.target.style.borderColor = passwordErrors.currentPassword ? '#ef4444' : '#e5e7eb'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#6b7280',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0.25rem'
+                    }}
+                  >
+                    {showPasswords.current ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+                {passwordErrors.currentPassword && (
+                  <p style={{ margin: '0.5rem 0 0 0', color: '#ef4444', fontSize: '0.875rem' }}>
+                    {passwordErrors.currentPassword}
+                  </p>
+                )}
+              </div>
+
+              {/* New Password */}
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '0.5rem', 
+                  fontWeight: '600',
+                  color: '#374151',
+                  fontSize: '0.875rem'
+                }}>
+                  New Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type={showPasswords.new ? 'text' : 'password'}
+                    placeholder="Enter your new password"
+                    value={passwordData.newPassword}
+                    onChange={(e) => {
+                      setPasswordData(prev => ({ ...prev, newPassword: e.target.value }));
+                      if (passwordErrors.newPassword) {
+                        setPasswordErrors(prev => ({ ...prev, newPassword: null }));
+                      }
+                    }}
+                    style={{ 
+                      padding: '0.875rem 3rem 0.875rem 1rem', 
+                      border: `2px solid ${passwordErrors.newPassword ? '#ef4444' : '#e5e7eb'}`, 
+                      borderRadius: '8px',
+                      backgroundColor: 'white',
+                      color: '#111827',
+                      width: '100%',
+                      fontSize: '1rem',
+                      transition: 'border-color 0.2s ease',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#6366f1'}
+                    onBlur={(e) => e.target.style.borderColor = passwordErrors.newPassword ? '#ef4444' : '#e5e7eb'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#6b7280',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0.25rem'
+                    }}
+                  >
+                    {showPasswords.new ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+                {passwordData.newPassword && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <div style={{ 
+                      height: '4px', 
+                      background: '#e5e7eb', 
+                      borderRadius: '2px',
+                      overflow: 'hidden',
+                      marginBottom: '0.25rem'
+                    }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${(getPasswordStrength(passwordData.newPassword).strength / 5) * 100}%`,
+                        background: getPasswordStrength(passwordData.newPassword).color,
+                        transition: 'all 0.3s ease'
+                      }} />
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.75rem', color: getPasswordStrength(passwordData.newPassword).color, fontWeight: '500' }}>
+                      {getPasswordStrength(passwordData.newPassword).label}
+                    </p>
+                  </div>
+                )}
+                {passwordErrors.newPassword && (
+                  <p style={{ margin: '0.5rem 0 0 0', color: '#ef4444', fontSize: '0.875rem' }}>
+                    {passwordErrors.newPassword}
+                  </p>
+                )}
+                <p style={{ margin: '0.5rem 0 0 0', color: '#6b7280', fontSize: '0.75rem' }}>
+                  Password must be at least 6 characters long
+                </p>
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '0.5rem', 
+                  fontWeight: '600',
+                  color: '#374151',
+                  fontSize: '0.875rem'
+                }}>
+                  Confirm New Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type={showPasswords.confirm ? 'text' : 'password'}
+                    placeholder="Confirm your new password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => {
+                      setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }));
+                      if (passwordErrors.confirmPassword) {
+                        setPasswordErrors(prev => ({ ...prev, confirmPassword: null }));
+                      }
+                    }}
+                    style={{ 
+                      padding: '0.875rem 3rem 0.875rem 1rem', 
+                      border: `2px solid ${passwordErrors.confirmPassword ? '#ef4444' : passwordData.confirmPassword && passwordData.newPassword === passwordData.confirmPassword ? '#10b981' : '#e5e7eb'}`, 
+                      borderRadius: '8px',
+                      backgroundColor: 'white',
+                      color: '#111827',
+                      width: '100%',
+                      fontSize: '1rem',
+                      transition: 'border-color 0.2s ease',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#6366f1'}
+                    onBlur={(e) => {
+                      const borderColor = passwordErrors.confirmPassword 
+                        ? '#ef4444' 
+                        : passwordData.confirmPassword && passwordData.newPassword === passwordData.confirmPassword 
+                          ? '#10b981' 
+                          : '#e5e7eb';
+                      e.target.style.borderColor = borderColor;
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#6b7280',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0.25rem'
+                    }}
+                  >
+                    {showPasswords.confirm ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+                {passwordErrors.confirmPassword && (
+                  <p style={{ margin: '0.5rem 0 0 0', color: '#ef4444', fontSize: '0.875rem' }}>
+                    {passwordErrors.confirmPassword}
+                  </p>
+                )}
+                {passwordData.confirmPassword && passwordData.newPassword === passwordData.confirmPassword && !passwordErrors.confirmPassword && (
+                  <p style={{ margin: '0.5rem 0 0 0', color: '#10b981', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <CheckCircle size={16} />
+                    Passwords match
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={handleClosePasswordModal}
+                disabled={changingPassword}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'white',
+                  color: '#374151',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: changingPassword ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease',
+                  opacity: changingPassword ? 0.6 : 1
+                }}
+                onMouseEnter={(e) => {
+                  if (!changingPassword) {
+                    e.target.style.borderColor = '#d1d5db';
+                    e.target.style.background = '#f9fafb';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!changingPassword) {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.background = 'white';
+                  }
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handlePasswordChange}
+                disabled={changingPassword || passwordSuccess}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: changingPassword || passwordSuccess ? '#9ca3af' : 'var(--primary-color)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: changingPassword || passwordSuccess ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => {
+                  if (!changingPassword && !passwordSuccess) {
+                    e.target.style.background = '#4f46e5';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!changingPassword && !passwordSuccess) {
+                    e.target.style.background = 'var(--primary-color)';
+                  }
+                }}
+              >
+                {changingPassword ? (
+                  <>
+                    <Clock size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                    Changing...
+                  </>
+                ) : passwordSuccess ? (
+                  <>
+                    <CheckCircle size={16} />
+                    Success
+                  </>
+                ) : (
+                  <>
+                    <Key size={16} />
+                    Change Password
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
