@@ -292,163 +292,176 @@ const LeaveManagement = () => {
                 </div>
               </div>
             </div>
-            <button 
-              onClick={handleApplyLeaveClick}
-              style={{
-                background: 'rgba(255, 255, 255, 0.2)',
-                border: '2px solid rgba(255, 255, 255, 0.3)',
-                borderRadius: '12px',
-                padding: '1rem 2rem',
-                color: 'white',
-                fontSize: '1rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                transition: 'all 0.3s ease',
-                backdropFilter: 'blur(10px)'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = 'rgba(255, 255, 255, 0.3)';
-                e.target.style.transform = 'translateY(-2px)';
-                e.target.style.boxShadow = '0 10px 20px rgba(0, 0, 0, 0.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = 'rgba(255, 255, 255, 0.2)';
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = 'none';
-              }}
-            >
-              <Plus size={18} />
-              Apply Leave
-            </button>
+            {user.role === 'employee' && (
+              <button 
+                onClick={handleApplyLeaveClick}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '12px',
+                  padding: '1rem 2rem',
+                  color: 'white',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  transition: 'all 0.3s ease',
+                  backdropFilter: 'blur(10px)'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = 'rgba(255, 255, 255, 0.3)';
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 10px 20px rgba(0, 0, 0, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'rgba(255, 255, 255, 0.2)';
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = 'none';
+                }}
+              >
+                <Plus size={18} />
+                Apply Leave
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Modern Leave Stats Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-        {/* Remaining Leave Card */}
-        <div style={{
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-          borderRadius: '1rem',
-          padding: '2rem',
-          color: 'white',
-          position: 'relative',
-          overflow: 'hidden',
-          cursor: 'pointer',
-          transition: 'all 0.3s ease'
-        }}
-        onClick={() => setShowRemainingLeaveModal(true)}
-        onMouseEnter={(e) => {
-          e.target.style.transform = 'translateY(-5px) scale(1.02)';
-          e.target.style.boxShadow = '0 20px 40px rgba(16, 185, 129, 0.3)';
-        }}
-        onMouseLeave={(e) => {
-          e.target.style.transform = 'translateY(0) scale(1)';
-          e.target.style.boxShadow = 'none';
-        }}>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: user.role === 'admin' 
+          ? 'repeat(auto-fit, minmax(400px, 1fr))' 
+          : 'repeat(auto-fit, minmax(280px, 1fr))', 
+        gap: '1.5rem', 
+        marginBottom: '2rem' 
+      }}>
+        {/* Remaining Leave Card - Only for Employees */}
+        {user.role === 'employee' && (
           <div style={{
-            position: 'absolute',
-            top: '-30px',
-            right: '-30px',
-            width: '120px',
-            height: '120px',
-            background: 'rgba(255, 255, 255, 0.1)',
-            borderRadius: '50%'
-          }}></div>
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.2)',
-                padding: '0.75rem',
-                borderRadius: '12px',
-                backdropFilter: 'blur(10px)'
-              }}>
-                <Calendar size={24} />
-              </div>
-              <div style={{ fontSize: '3rem', fontWeight: '800', fontFamily: 'monospace' }}>
-                {user.role === 'employee' ? '18' : Math.round(displayRequests.length / 8 * 18)}
-              </div>
-            </div>
-            <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Days Remaining</div>
-            <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>Out of 30 annual days</div>
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            borderRadius: '1rem',
+            padding: '2rem',
+            color: 'white',
+            position: 'relative',
+            overflow: 'hidden',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease'
+          }}
+          onClick={() => setShowRemainingLeaveModal(true)}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'translateY(-5px) scale(1.02)';
+            e.target.style.boxShadow = '0 20px 40px rgba(16, 185, 129, 0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'translateY(0) scale(1)';
+            e.target.style.boxShadow = 'none';
+          }}>
             <div style={{
-              width: '100%',
-              height: '4px',
-              background: 'rgba(255, 255, 255, 0.3)',
-              borderRadius: '2px',
-              marginTop: '1rem',
-              overflow: 'hidden'
-            }}>
+              position: 'absolute',
+              top: '-30px',
+              right: '-30px',
+              width: '120px',
+              height: '120px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: '50%'
+            }}></div>
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  padding: '0.75rem',
+                  borderRadius: '12px',
+                  backdropFilter: 'blur(10px)'
+                }}>
+                  <Calendar size={24} />
+                </div>
+                <div style={{ fontSize: '3rem', fontWeight: '800', fontFamily: 'monospace' }}>
+                  18
+                </div>
+              </div>
+              <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Days Remaining</div>
+              <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>Out of 30 annual days</div>
               <div style={{
-                width: `${((user.role === 'employee' ? 18 : Math.round(displayRequests.length / 8 * 18)) / 30) * 100}%`,
-                height: '100%',
-                background: 'rgba(255, 255, 255, 0.8)',
+                width: '100%',
+                height: '4px',
+                background: 'rgba(255, 255, 255, 0.3)',
                 borderRadius: '2px',
-                transition: 'width 0.3s ease'
-              }}></div>
-            </div>
-          </div>
-        </div>
-
-        {/* Used Leave Card */}
-        <div style={{
-          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-          borderRadius: '1rem',
-          padding: '2rem',
-          color: 'white',
-          position: 'relative',
-          overflow: 'hidden',
-          cursor: 'pointer',
-          transition: 'all 0.3s ease'
-        }}
-        onClick={() => setShowUsedLeaveModal(true)}
-        onMouseEnter={(e) => {
-          e.target.style.transform = 'translateY(-5px) scale(1.02)';
-          e.target.style.boxShadow = '0 20px 40px rgba(59, 130, 246, 0.3)';
-        }}
-        onMouseLeave={(e) => {
-          e.target.style.transform = 'translateY(0) scale(1)';
-          e.target.style.boxShadow = 'none';
-        }}>
-          <div style={{
-            position: 'absolute',
-            top: '-30px',
-            right: '-30px',
-            width: '120px',
-            height: '120px',
-            background: 'rgba(255, 255, 255, 0.1)',
-            borderRadius: '50%'
-          }}></div>
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.2)',
-                padding: '0.75rem',
-                borderRadius: '12px',
-                backdropFilter: 'blur(10px)'
+                marginTop: '1rem',
+                overflow: 'hidden'
               }}>
-                <Check size={24} />
+                <div style={{
+                  width: `${(18 / 30) * 100}%`,
+                  height: '100%',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  borderRadius: '2px',
+                  transition: 'width 0.3s ease'
+                }}></div>
               </div>
-              <div style={{ fontSize: '3rem', fontWeight: '800', fontFamily: 'monospace' }}>
-                {displayRequests.filter(l => l.status === 'approved').reduce((acc, l) => acc + l.days, 0)}
-              </div>
-            </div>
-            <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Days Used</div>
-            <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>Approved leave days</div>
-            <div style={{
-              display: 'flex',
-              gap: '0.5rem',
-              marginTop: '1rem',
-              fontSize: '0.75rem'
-            }}>
-              <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '0.25rem 0.5rem', borderRadius: '12px' }}>Vacation: {displayRequests.filter(l => l.status === 'approved' && l.type === 'vacation').reduce((acc, l) => acc + l.days, 0)}</span>
-              <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '0.25rem 0.5rem', borderRadius: '12px' }}>Sick: {displayRequests.filter(l => l.status === 'approved' && l.type === 'sick').reduce((acc, l) => acc + l.days, 0)}</span>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Used Leave Card - Only for Employees */}
+        {user.role === 'employee' && (
+          <div style={{
+            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+            borderRadius: '1rem',
+            padding: '2rem',
+            color: 'white',
+            position: 'relative',
+            overflow: 'hidden',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease'
+          }}
+          onClick={() => setShowUsedLeaveModal(true)}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'translateY(-5px) scale(1.02)';
+            e.target.style.boxShadow = '0 20px 40px rgba(59, 130, 246, 0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'translateY(0) scale(1)';
+            e.target.style.boxShadow = 'none';
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: '-30px',
+              right: '-30px',
+              width: '120px',
+              height: '120px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: '50%'
+            }}></div>
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  padding: '0.75rem',
+                  borderRadius: '12px',
+                  backdropFilter: 'blur(10px)'
+                }}>
+                  <Check size={24} />
+                </div>
+                <div style={{ fontSize: '3rem', fontWeight: '800', fontFamily: 'monospace' }}>
+                  {displayRequests.filter(l => l.status === 'approved').reduce((acc, l) => acc + l.days, 0)}
+                </div>
+              </div>
+              <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Days Used</div>
+              <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>Approved leave days</div>
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                marginTop: '1rem',
+                fontSize: '0.75rem'
+              }}>
+                <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '0.25rem 0.5rem', borderRadius: '12px' }}>Vacation: {displayRequests.filter(l => l.status === 'approved' && l.type === 'vacation').reduce((acc, l) => acc + l.days, 0)}</span>
+                <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '0.25rem 0.5rem', borderRadius: '12px' }}>Sick: {displayRequests.filter(l => l.status === 'approved' && l.type === 'sick').reduce((acc, l) => acc + l.days, 0)}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Pending Requests Card */}
         <div style={{
