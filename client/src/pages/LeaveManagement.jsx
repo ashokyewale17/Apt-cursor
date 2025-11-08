@@ -12,6 +12,8 @@ const LeaveManagement = () => {
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [myLeaves, setMyLeaves] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   
   // Add state for detailed leave information modals
   const [showRemainingLeaveModal, setShowRemainingLeaveModal] = useState(false);
@@ -38,92 +40,110 @@ const LeaveManagement = () => {
 
   useEffect(() => {
     loadLeaveData();
-  }, []);
+  }, [filterStatus]);
 
-  const loadLeaveData = () => {
-    // Mock leave requests data
-    const mockLeaveRequests = [
-      {
-        id: 1,
-        employee: { name: 'Jane Employee', department: 'Engineering', id: '2' },
-        type: 'vacation',
-        startDate: new Date(2024, 2, 15),
-        endDate: new Date(2024, 2, 20),
-        days: 6,
-        reason: 'Family vacation to Hawaii',
-        status: 'pending',
-        appliedDate: new Date(2024, 2, 1),
-        approver: null
-      },
-      {
-        id: 2,
-        employee: { name: 'Mike Johnson', department: 'Marketing', id: '3' },
-        type: 'sick',
-        startDate: new Date(2024, 2, 10),
-        endDate: new Date(2024, 2, 12),
-        days: 3,
-        reason: 'Flu symptoms, doctor advised rest',
-        status: 'approved',
-        appliedDate: new Date(2024, 2, 9),
-        approver: 'John Admin',
-        approvedDate: new Date(2024, 2, 9)
-      },
-      {
-        id: 3,
-        employee: { name: 'Sarah Wilson', department: 'Design', id: '4' },
-        type: 'personal',
-        startDate: new Date(2024, 2, 25),
-        endDate: new Date(2024, 2, 25),
-        days: 1,
-        reason: 'Wedding anniversary celebration',
-        status: 'rejected',
-        appliedDate: new Date(2024, 2, 20),
-        approver: 'John Admin',
-        approvedDate: new Date(2024, 2, 21),
-        rejectionReason: 'Peak project deadline period'
+  const loadLeaveData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('token');
+      const statusParam = filterStatus === 'all' ? '' : `?status=${filterStatus}`;
+      
+      const response = await fetch(`/api/leaves${statusParam}`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : undefined
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.message || 'Failed to fetch leave requests');
       }
-    ];
-
-    setLeaveRequests(mockLeaveRequests);
-
-    // Filter user's leaves if employee
-    if (user.role === 'employee') {
-      setMyLeaves(mockLeaveRequests.filter(leave => leave.employee.id === user.id));
+      
+      const data = await response.json();
+      
+      // Ensure data is an array
+      if (!Array.isArray(data)) {
+        console.error('API returned non-array data:', data);
+        setLeaveRequests([]);
+        setMyLeaves([]);
+        return;
+      }
+      
+      // Format dates to Date objects
+      const formattedData = data.map(leave => ({
+        ...leave,
+        startDate: new Date(leave.startDate),
+        endDate: new Date(leave.endDate),
+        appliedDate: new Date(leave.appliedDate),
+        approvedDate: leave.approvedDate ? new Date(leave.approvedDate) : null
+      }));
+      
+      setLeaveRequests(formattedData);
+      
+      // Filter user's leaves if employee
+      if (user.role === 'employee') {
+        setMyLeaves(formattedData);
+      } else {
+        setMyLeaves(formattedData);
+      }
+    } catch (err) {
+      console.error('Error loading leave data:', err);
+      setError(err.message || 'Failed to load leave requests');
+      setLeaveRequests([]);
+      setMyLeaves([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleApplyLeave = async (e) => {
     e.preventDefault();
+    setError('');
+    setLoading(true);
     
-    const startDate = new Date(leaveForm.startDate);
-    const endDate = new Date(leaveForm.endDate);
-    const days = differenceInDays(endDate, startDate) + 1;
-
-    const newLeave = {
-      id: Date.now(),
-      employee: { name: user.name, department: user.department, id: user.id },
-      type: leaveForm.type,
-      startDate,
-      endDate,
-      days,
-      reason: leaveForm.reason,
-      status: 'pending',
-      appliedDate: new Date(),
-      approver: null
-    };
-
-    setLeaveRequests(prev => [newLeave, ...prev]);
-    setMyLeaves(prev => [newLeave, ...prev]);
-    
-    setShowApplyModal(false);
-    setLeaveForm({
-      type: 'vacation',
-      startDate: format(new Date(), 'yyyy-MM-dd'),
-      endDate: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
-      reason: ''
-    });
-
-    alert('Leave request submitted successfully!');
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch('/api/leaves', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : undefined
+        },
+        body: JSON.stringify({
+          type: leaveForm.type,
+          startDate: leaveForm.startDate,
+          endDate: leaveForm.endDate,
+          reason: leaveForm.reason
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to submit leave request');
+      }
+      
+      setShowApplyModal(false);
+      setLeaveForm({
+        type: 'vacation',
+        startDate: format(new Date(), 'yyyy-MM-dd'),
+        endDate: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
+        reason: ''
+      });
+      
+      // Reload leave data
+      await loadLeaveData();
+      
+      alert('Leave request submitted successfully!');
+    } catch (err) {
+      console.error('Error submitting leave request:', err);
+      setError(err.message || 'Failed to submit leave request');
+      alert(err.message || 'Failed to submit leave request. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleApplyLeaveClick = () => {
@@ -140,22 +160,44 @@ const LeaveManagement = () => {
     }, 100);
   };
 
-  const handleApproveReject = (leaveId, action, rejectionReason = '') => {
-    setLeaveRequests(prev => 
-      prev.map(leave => 
-        leave.id === leaveId 
-          ? {
-              ...leave,
-              status: action,
-              approver: user.name,
-              approvedDate: new Date(),
-              ...(action === 'rejected' && { rejectionReason })
-            }
-          : leave
-      )
-    );
-    setShowDetailModal(false);
-    alert(`Leave request ${action} successfully!`);
+  const handleApproveReject = async (leaveId, action, rejectionReason = '') => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const token = localStorage.getItem('token');
+      const endpoint = action === 'approved' ? 'approve' : 'reject';
+      
+      const response = await fetch(`/api/leaves/${leaveId}/${endpoint}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : undefined
+        },
+        body: JSON.stringify({
+          ...(action === 'rejected' && rejectionReason ? { rejectionReason } : {})
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || `Failed to ${action} leave request`);
+      }
+      
+      setShowDetailModal(false);
+      
+      // Reload leave data
+      await loadLeaveData();
+      
+      alert(`Leave request ${action} successfully!`);
+    } catch (err) {
+      console.error(`Error ${action} leave request:`, err);
+      setError(err.message || `Failed to ${action} leave request`);
+      alert(err.message || `Failed to ${action} leave request. Please try again.`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -176,22 +218,29 @@ const LeaveManagement = () => {
     return leaveType ? leaveType.emoji : '📝';
   };
 
-  const filteredRequests = leaveRequests.filter(leave => {
-    if (filterStatus === 'all') return true;
-    return leave.status === filterStatus;
-  });
-
-  const displayRequests = user.role === 'admin' ? filteredRequests : myLeaves;
+  // For admin, we want to show filtered requests (filtering is done on backend)
+  // For employee, show their own leaves
+  const displayRequests = user.role === 'admin' ? leaveRequests : myLeaves;
 
   // Function to calculate leave details for modals
   const calculateLeaveDetails = () => {
     const approvedLeaves = displayRequests.filter(l => l.status === 'approved');
     const pendingLeaves = displayRequests.filter(l => l.status === 'pending');
     
+    // Calculate total days used
+    const totalDaysUsed = approvedLeaves.reduce((acc, l) => acc + l.days, 0);
+    
+    // Annual leave allowance (30 days)
+    const annualLeaveAllowance = 30;
+    const totalRemaining = Math.max(0, annualLeaveAllowance - totalDaysUsed);
+    
     // Calculate remaining leave per month
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthlyLeaveData = months.map((month, index) => {
-      const monthLeaves = approvedLeaves.filter(leave => leave.startDate.getMonth() === index);
+      const monthLeaves = approvedLeaves.filter(leave => {
+        const leaveDate = new Date(leave.startDate);
+        return leaveDate.getMonth() === index;
+      });
       const daysUsed = monthLeaves.reduce((acc, leave) => acc + leave.days, 0);
       return {
         month,
@@ -232,8 +281,8 @@ const LeaveManagement = () => {
       usedLeaveDetails,
       pendingRequestsDetails,
       approvedLeavesDetails,
-      totalRemaining: user.role === 'employee' ? 18 : Math.round(displayRequests.length / 8 * 18),
-      totalUsed: approvedLeaves.reduce((acc, l) => acc + l.days, 0),
+      totalRemaining,
+      totalUsed: totalDaysUsed,
       totalPending: pendingLeaves.length,
       totalApproved: approvedLeaves.length
     };
@@ -288,7 +337,7 @@ const LeaveManagement = () => {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Clock size={16} />
-                  <span>{displayRequests.filter(l => l.status === 'pending').length} Pending Reviews</span>
+                  <span>{leaveDetails.totalPending} Pending Reviews</span>
                 </div>
               </div>
             </div>
@@ -378,9 +427,9 @@ const LeaveManagement = () => {
                 }}>
                   <Calendar size={24} />
                 </div>
-                <div style={{ fontSize: '3rem', fontWeight: '800', fontFamily: 'monospace' }}>
-                  18
-                </div>
+              <div style={{ fontSize: '3rem', fontWeight: '800', fontFamily: 'monospace' }}>
+                {leaveDetails.totalRemaining}
+              </div>
               </div>
               <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Days Remaining</div>
               <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>Out of 30 annual days</div>
@@ -393,7 +442,7 @@ const LeaveManagement = () => {
                 overflow: 'hidden'
               }}>
                 <div style={{
-                  width: `${(18 / 30) * 100}%`,
+                  width: `${Math.min(100, (leaveDetails.totalRemaining / 30) * 100)}%`,
                   height: '100%',
                   background: 'rgba(255, 255, 255, 0.8)',
                   borderRadius: '2px',
@@ -445,7 +494,7 @@ const LeaveManagement = () => {
                   <Check size={24} />
                 </div>
                 <div style={{ fontSize: '3rem', fontWeight: '800', fontFamily: 'monospace' }}>
-                  {displayRequests.filter(l => l.status === 'approved').reduce((acc, l) => acc + l.days, 0)}
+                  {leaveDetails.totalUsed}
                 </div>
               </div>
               <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Days Used</div>
@@ -456,8 +505,8 @@ const LeaveManagement = () => {
                 marginTop: '1rem',
                 fontSize: '0.75rem'
               }}>
-                <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '0.25rem 0.5rem', borderRadius: '12px' }}>Vacation: {displayRequests.filter(l => l.status === 'approved' && l.type === 'vacation').reduce((acc, l) => acc + l.days, 0)}</span>
-                <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '0.25rem 0.5rem', borderRadius: '12px' }}>Sick: {displayRequests.filter(l => l.status === 'approved' && l.type === 'sick').reduce((acc, l) => acc + l.days, 0)}</span>
+                <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '0.25rem 0.5rem', borderRadius: '12px' }}>Vacation: {leaveDetails.usedLeaveDetails.filter(l => l.type === 'vacation').reduce((acc, l) => acc + l.days, 0)}</span>
+                <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '0.25rem 0.5rem', borderRadius: '12px' }}>Sick: {leaveDetails.usedLeaveDetails.filter(l => l.type === 'sick').reduce((acc, l) => acc + l.days, 0)}</span>
               </div>
             </div>
           </div>
@@ -502,13 +551,13 @@ const LeaveManagement = () => {
               }}>
                 <Clock size={24} />
               </div>
-              <div style={{ fontSize: '3rem', fontWeight: '800', fontFamily: 'monospace' }}>
-                {displayRequests.filter(l => l.status === 'pending').length}
+                <div style={{ fontSize: '3rem', fontWeight: '800', fontFamily: 'monospace' }}>
+                {leaveDetails.totalPending}
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <div style={{ fontSize: '1.125rem', fontWeight: '600' }}>Pending Requests</div>
-              {displayRequests.filter(l => l.status === 'pending').length > 0 && (
+              {leaveDetails.totalPending > 0 && (
                 <div style={{
                   width: '8px',
                   height: '8px',
@@ -519,7 +568,7 @@ const LeaveManagement = () => {
               )}
             </div>
             <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>Awaiting approval</div>
-            {displayRequests.filter(l => l.status === 'pending').length > 0 && (
+            {leaveDetails.totalPending > 0 && (
               <div style={{
                 marginTop: '1rem',
                 padding: '0.5rem',
@@ -573,7 +622,7 @@ const LeaveManagement = () => {
                 <Plus size={24} />
               </div>
               <div style={{ fontSize: '3rem', fontWeight: '800', fontFamily: 'monospace' }}>
-                {displayRequests.filter(l => l.status === 'approved').length}
+                {leaveDetails.totalApproved}
               </div>
             </div>
             <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Approved Leaves</div>
@@ -586,7 +635,7 @@ const LeaveManagement = () => {
             }}>
               <span>Utilization Rate</span>
               <span style={{ fontWeight: '600' }}>
-                {Math.round((displayRequests.filter(l => l.status === 'approved').reduce((acc, l) => acc + l.days, 0) / 30) * 100)}%
+                {Math.round((leaveDetails.totalUsed / 30) * 100)}%
               </span>
             </div>
           </div>
@@ -615,6 +664,18 @@ const LeaveManagement = () => {
         </div>
       )}
 
+      {/* Error Display */}
+      {error && (
+        <div className="card" style={{ marginBottom: '2rem', background: '#fef2f2', border: '1px solid #ef4444' }}>
+          <div className="card-body">
+            <div style={{ color: '#991b1b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span>❌</span>
+              <span>{error}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Leave Requests Grid */}
       <div className="card">
         <div className="card-header">
@@ -622,11 +683,17 @@ const LeaveManagement = () => {
             {user.role === 'admin' ? 'All Leave Requests' : 'My Leave Requests'}
           </h3>
           <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-            {displayRequests.length} requests
+            {loading ? 'Loading...' : `${displayRequests.length} requests`}
           </span>
         </div>
         <div className="card-body">
-          {displayRequests.length === 0 ? (
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '3rem' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
+              <h3>Loading leave requests...</h3>
+              <p style={{ color: 'var(--text-secondary)' }}>Please wait while we fetch your data.</p>
+            </div>
+          ) : displayRequests.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem' }}>
               <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📝</div>
               <h3>No leave requests found</h3>
@@ -789,10 +856,12 @@ const LeaveManagement = () => {
                               <Check size={12} />
                             </button>
                             <button
-                              onClick={(e) => {
+                              onClick={async (e) => {
                                 e.stopPropagation();
                                 const reason = prompt('Rejection reason (optional):');
-                                handleApproveReject(leave.id, 'rejected', reason);
+                                if (reason !== null) { // User clicked OK (even if empty)
+                                  await handleApproveReject(leave.id, 'rejected', reason || '');
+                                }
                               }}
                               className="btn btn-danger btn-sm"
                               style={{ 
@@ -1049,9 +1118,11 @@ const LeaveManagement = () => {
                     Approve
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const reason = prompt('Rejection reason (optional):');
-                      handleApproveReject(selectedLeave.id, 'rejected', reason);
+                      if (reason !== null) { // User clicked OK (even if empty)
+                        await handleApproveReject(selectedLeave.id, 'rejected', reason || '');
+                      }
                     }}
                     className="btn btn-danger"
                   >
