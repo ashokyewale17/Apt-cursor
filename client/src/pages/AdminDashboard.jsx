@@ -361,6 +361,7 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     loadDashboardData();
+    loadWorkingSaturdays(); // Load working Saturdays on mount
     // Load real employees from API
     const fetchEmployees = async (includeInactive = false) => {
       try {
@@ -1617,6 +1618,39 @@ const AdminDashboard = () => {
             </div>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
               <button 
+                onClick={() => {
+                  setShowWorkingSaturdaysModal(true);
+                  loadWorkingSaturdays();
+                }}
+                className="btn" 
+                style={{ 
+                  background: 'rgba(139, 92, 246, 0.9)', 
+                  color: 'white', 
+                  border: '1px solid rgba(139, 92, 246, 1)',
+                  padding: '0.65rem 1.25rem',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease',
+                  backdropFilter: 'blur(5px)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(139, 92, 246, 1)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.9)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <Calendar size={16} />
+                Manage Working Saturdays
+              </button>
+              <button 
                 onClick={refreshData}
                 className="btn" 
                 style={{ 
@@ -1646,6 +1680,36 @@ const AdminDashboard = () => {
               >
                 <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
                 Refresh
+              </button>
+              <button 
+                onClick={() => setShowSettingsModal(true)}
+                className="btn" 
+                style={{ 
+                  background: 'rgba(255, 255, 255, 0.2)', 
+                  color: 'white', 
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  padding: '0.65rem 1.25rem',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease',
+                  backdropFilter: 'blur(5px)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <Settings size={16} />
+                Settings
               </button>
             </div>
           </div>
@@ -1802,6 +1866,38 @@ const AdminDashboard = () => {
           </div>
           <div style={{ fontSize: '0.875rem', color: 'var(--info-color, #3b82f6)', marginTop: '0.5rem' }}>
             <ArrowUpRight size={14} style={{ display: 'inline' }} /> Employees with comp off days
+          </div>
+        </div>
+
+        <div className="stat-card" style={{ borderLeft: '4px solid #8b5cf6', cursor: 'pointer', transition: 'all 0.2s ease' }}
+             onClick={() => {
+               setShowWorkingSaturdaysModal(true);
+               loadWorkingSaturdays();
+             }}
+             onMouseEnter={(e) => {
+               e.currentTarget.style.transform = 'translateY(-2px)';
+               e.currentTarget.style.boxShadow = '0 8px 25px rgba(139, 92, 246, 0.15)';
+             }}
+             onMouseLeave={(e) => {
+               e.currentTarget.style.transform = 'translateY(0)';
+               e.currentTarget.style.boxShadow = '';
+             }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div className="stat-value" style={{ color: '#8b5cf6' }}>
+                {workingSaturdays.filter(ws => ws.isWorking).length}
+              </div>
+              <div className="stat-label">
+                <Calendar size={16} style={{ display: 'inline', marginRight: '0.25rem' }} />
+                Working Saturdays
+              </div>
+            </div>
+            <div style={{ padding: '0.5rem', background: '#8b5cf6', borderRadius: '0.5rem' }}>
+              <Calendar size={20} style={{ color: 'white' }} />
+            </div>
+          </div>
+          <div style={{ fontSize: '0.875rem', color: '#8b5cf6', marginTop: '0.5rem' }}>
+            <ArrowUpRight size={14} style={{ display: 'inline' }} /> Click to manage working Saturdays
           </div>
         </div>
       </div>
