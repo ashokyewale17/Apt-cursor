@@ -3829,7 +3829,6 @@ const AdminDashboard = () => {
                       </th>
                       <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Present Days</th>
                       <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Leave Days</th>
-                      <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Total Hours</th>
                       <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Avg Hours</th>
                       <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Attendance Rate</th>
                     </tr>
@@ -3898,11 +3897,6 @@ const AdminDashboard = () => {
                             fontWeight: '600'
                           }}>
                             {employeeData.summary.leaveDays}
-                          </span>
-                        </td>
-                        <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid var(--border-color)' }}>
-                          <span style={{ fontWeight: '600', color: 'var(--primary-color)' }}>
-                            {convertDecimalToHoursMinutes(parseFloat(employeeData.summary.totalHours))}
                           </span>
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid var(--border-color)' }}>

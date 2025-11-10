@@ -350,7 +350,6 @@ Note: You can open this CSV file in Excel for full functionality.`);
     rows.push(['Total Employees', reportData.summary.totalEmployees]);
     rows.push(['Average Attendance Rate', `${reportData.summary.avgAttendanceRate}%`]);
     rows.push(['Total Present Days', reportData.summary.totalPresentDays]);
-    rows.push(['Total Hours Worked', reportData.summary.totalHours]);
     rows.push(['']); // Empty row
     
     // Employee Summary Table
@@ -363,7 +362,6 @@ Note: You can open this CSV file in Excel for full functionality.`);
       'Leave Days',
       'Early Leave Days',
       'Half Days',
-      'Total Hours',
       'Average Hours/Day',
       'Attendance Rate (%)'
     ];
@@ -379,7 +377,6 @@ Note: You can open this CSV file in Excel for full functionality.`);
         employeeData.summary.leaveDays,
         employeeData.summary.earlyLeaveDays,
         employeeData.summary.halfDays,
-        employeeData.summary.totalHours,
         convertDecimalToHoursMinutes(parseFloat(employeeData.summary.avgHours)),
         employeeData.summary.attendanceRate
       ]);
@@ -625,7 +622,6 @@ Note: You can open this CSV file in Excel for full functionality.`);
                       <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Leave Days</th>
                       <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Early Leave</th>
                       <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Half Day</th>
-                      <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Total Hours</th>
                       <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Avg Hours</th>
                       <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Attendance Rate</th>
                       <th style={{ 
@@ -790,11 +786,6 @@ Note: You can open this CSV file in Excel for full functionality.`);
                             }
                           }}>
                             {employeeData.summary.halfDays}
-                          </span>
-                        </td>
-                        <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid var(--border-color)' }}>
-                          <span style={{ fontWeight: '600', color: 'var(--primary-color)' }}>
-                            {convertDecimalToHoursMinutes(parseFloat(employeeData.summary.totalHours))}
                           </span>
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid var(--border-color)' }}>
