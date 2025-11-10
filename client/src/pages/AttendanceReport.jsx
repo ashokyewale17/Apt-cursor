@@ -14,7 +14,6 @@ const AttendanceReport = () => {
   const [selectedEmployee, setSelectedEmployee] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [viewMode, setViewMode] = useState('calendar'); // 'calendar' or 'table'
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailData, setDetailData] = useState({ employee: null, records: [], title: '' });
 
@@ -583,23 +582,6 @@ Note: You can open this CSV file in Excel for full functionality.`);
               </div>
             </div>
             
-            {/* View Mode Toggle */}
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button 
-                onClick={() => setViewMode('calendar')}
-                className={`btn btn-sm ${viewMode === 'calendar' ? 'btn-primary' : 'btn-outline'}`}
-              >
-                <Calendar size={14} />
-                Calendar
-              </button>
-              <button 
-                onClick={() => setViewMode('table')}
-                className={`btn btn-sm ${viewMode === 'table' ? 'btn-primary' : 'btn-outline'}`}
-              >
-                <BarChart3 size={14} />
-                Table
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -614,238 +596,7 @@ Note: You can open this CSV file in Excel for full functionality.`);
       ) : (
         <div className="card">
           <div className="card-body" style={{ padding: 0 }}>
-            {viewMode === 'calendar' ? (
-              /* Calendar View */
-              <div style={{ padding: '1.5rem' }}>
-                {filteredAttendance.map((employeeData, empIndex) => (
-                  <div key={employeeData.employee.id} style={{ marginBottom: empIndex < filteredAttendance.length - 1 ? '3rem' : '0' }}>
-                    {/* Employee Header - Non-clickable */}
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '1.5rem',
-                      padding: '1rem',
-                      background: 'linear-gradient(135deg, var(--background-alt) 0%, #f8fafc 100%)',
-                      borderRadius: '12px',
-                      border: '1px solid var(--border-color)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <div style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, var(--primary-color), #6366f1)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          fontWeight: 'bold',
-                          fontSize: '1rem'
-                        }}>
-                          {employeeData.employee.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <div>
-                          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600' }}>
-                            {employeeData.employee.name}
-                          </h3>
-                          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                            {employeeData.employee.role} • {employeeData.employee.department}
-                          </p>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--success-color)' }}>
-                            {employeeData.summary.presentDays}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Present Days</div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary-color)' }}>
-                            {convertDecimalToHoursMinutes(parseFloat(employeeData.summary.avgHours))}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Avg Hours</div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#8b5cf6' }}>
-                            {employeeData.summary.attendanceRate}%
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Attendance</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Calendar Grid - Only individual days are clickable */}
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(7, 1fr)',
-                      gap: '1px',
-                      background: 'var(--border-color)',
-                      borderRadius: '12px',
-                      overflow: 'hidden',
-                      border: '1px solid var(--border-color)',
-                      userSelect: 'none' // Prevent text selection on calendar
-                    }}>
-                      {/* Day Headers */}
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} style={{
-                          background: 'var(--background-alt)',
-                          padding: '0.75rem',
-                          textAlign: 'center',
-                          fontWeight: '600',
-                          fontSize: '0.875rem',
-                          color: 'var(--text-secondary)'
-                        }}>
-                          {day}
-                        </div>
-                      ))}
-                      
-                      {/* Calendar Days */}
-                      {(() => {
-                        const firstDay = new Date(selectedYear, selectedMonth, 1).getDay();
-                        const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-                        const days = [];
-                        
-                        // Empty cells for days before month starts
-                        for (let i = 0; i < firstDay; i++) {
-                          days.push(
-                            <div key={`empty-${i}`} style={{
-                              background: '#f8fafc',
-                              minHeight: '80px'
-                            }} />
-                          );
-                        }
-                        
-                        // Days of the month
-                        for (let day = 1; day <= daysInMonth; day++) {
-                          const dayRecord = employeeData.attendanceRecords.find(r => r.date === day);
-                          const isToday = new Date().getDate() === day && 
-                                        new Date().getMonth() === selectedMonth && 
-                                        new Date().getFullYear() === selectedYear;
-                          
-                          days.push(
-                            <div key={day} style={{
-                              background: 'white',
-                              minHeight: '80px',
-                              padding: '0.5rem',
-                              position: 'relative',
-                              cursor: dayRecord && dayRecord.status !== 'future' && dayRecord.status !== 'weekend' ? 'pointer' : 'default',
-                              transition: 'all 0.2s ease',
-                              border: isToday ? '2px solid var(--primary-color)' : 'none'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (dayRecord && dayRecord.status !== 'future' && dayRecord.status !== 'weekend') {
-                                e.currentTarget.style.background = '#f8fafc';
-                                e.currentTarget.style.transform = 'scale(1.02)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (dayRecord && dayRecord.status !== 'future' && dayRecord.status !== 'weekend') {
-                                e.currentTarget.style.background = 'white';
-                                e.currentTarget.style.transform = 'scale(1)';
-                              }
-                            }}
-                            onClick={dayRecord && dayRecord.status !== 'future' && dayRecord.status !== 'weekend' ? () => {
-                              // Only show details if there's attendance data for this day
-                              alert(`${employeeData.employee.name} - ${format(new Date(selectedYear, selectedMonth, day), 'MMM dd, yyyy')}
-
-Status: ${dayRecord.status}
-In: ${dayRecord.inTime || 'N/A'}
-Out: ${dayRecord.outTime || 'N/A'}
-Hours: ${dayRecord.hoursWorked || '0'}h`);
-                            } : undefined}
-                            >
-                              <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'flex-start',
-                                marginBottom: '0.5rem'
-                              }}>
-                                <span style={{
-                                  fontWeight: '600',
-                                  fontSize: '0.875rem',
-                                  color: isToday ? 'var(--primary-color)' : 'var(--text-primary)'
-                                }}>
-                                  {day}
-                                </span>
-                                {dayRecord && dayRecord.status !== 'future' && (
-                                  <span style={{
-                                    width: '20px',
-                                    height: '20px',
-                                    borderRadius: '50%',
-                                    background: getStatusColor(dayRecord.status),
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: 'white',
-                                    fontSize: '0.75rem',
-                                    fontWeight: '600'
-                                  }}>
-                                    {getStatusIcon(dayRecord.status)}
-                                  </span>
-                                )}
-                              </div>
-                              
-                              {dayRecord && dayRecord.status !== 'weekend' && dayRecord.status !== 'future' && (
-                                <div style={{ fontSize: '0.75rem' }}>
-                                  {dayRecord.inTime && dayRecord.outTime ? (
-                                    <>
-                                      <div style={{ color: 'var(--success-color)', fontWeight: '500' }}>
-                                        In: {dayRecord.inTime}
-                                      </div>
-                                      <div style={{ color: 'var(--danger-color)', fontWeight: '500' }}>
-                                        Out: {dayRecord.outTime}
-                                      </div>
-                                      <div style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                                        {convertDecimalToHoursMinutes(parseFloat(dayRecord.hoursWorked))}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <div style={{ 
-                                      color: dayRecord.status === 'leave' ? '#3b82f6' : 'var(--danger-color)',
-                                      fontWeight: '500',
-                                      textTransform: 'capitalize'
-                                    }}>
-                                      {dayRecord.status}
-                                    </div>
-                                  )}
-                                  {/* Click indicator for days with data */}
-                                  <div style={{
-                                    fontSize: '0.625rem',
-                                    color: 'var(--text-secondary)',
-                                    marginTop: '0.25rem',
-                                    opacity: 0.7
-                                  }}>
-                                    Click for details
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {isToday && (
-                                <div style={{
-                                  position: 'absolute',
-                                  bottom: '0.25rem',
-                                  right: '0.25rem',
-                                  fontSize: '0.625rem',
-                                  color: 'var(--primary-color)',
-                                  fontWeight: '600'
-                                }}>
-                                  Today
-                                </div>
-                              )}
-                            </div>
-                          );
-                        }
-                        
-                        return days;
-                      })()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              /* Table View */
+            {/* Table View */}
               <div style={{ 
                 overflowX: 'auto',
                 maxWidth: '100%',
@@ -1121,7 +872,6 @@ Hours: ${dayRecord.hoursWorked || '0'}h`);
                   </tbody>
                 </table>
               </div>
-            )}
           </div>
         </div>
       )}
