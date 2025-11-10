@@ -78,7 +78,6 @@ const AdminDashboard = () => {
     autoBackup: true,
     theme: 'light'
   });
-  const [viewMode, setViewMode] = useState('table'); // Add viewMode state - default to 'table'
   const [showWorkingSaturdaysModal, setShowWorkingSaturdaysModal] = useState(false);
   const [workingSaturdays, setWorkingSaturdays] = useState([]);
   const [selectedSaturdayDate, setSelectedSaturdayDate] = useState('');
@@ -3684,41 +3683,6 @@ const AdminDashboard = () => {
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  {/* View Mode Toggle */}
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button 
-                      onClick={() => setViewMode('table')}
-                      className={`btn btn-sm ${viewMode === 'table' ? 'btn-primary' : 'btn-outline'}`}
-                      style={{ 
-                        background: viewMode === 'table' ? 'white' : 'rgba(255,255,255,0.2)', 
-                        color: viewMode === 'table' ? 'var(--primary-color)' : 'white',
-                        border: '1px solid rgba(255,255,255,0.3)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        padding: '0.25rem 0.5rem'
-                      }}
-                    >
-                      <BarChart3 size={14} />
-                      Table
-                    </button>
-                    <button 
-                      onClick={() => setViewMode('calendar')}
-                      className={`btn btn-sm ${viewMode === 'calendar' ? 'btn-primary' : 'btn-outline'}`}
-                      style={{ 
-                        background: viewMode === 'calendar' ? 'white' : 'rgba(255,255,255,0.2)', 
-                        color: viewMode === 'calendar' ? 'var(--primary-color)' : 'white',
-                        border: '1px solid rgba(255,255,255,0.3)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        padding: '0.25rem 0.5rem'
-                      }}
-                    >
-                      <Calendar size={14} />
-                      Calendar
-                    </button>
-                  </div>
                   <select 
                     value={`${selectedYear}-${selectedMonth}`}
                     onChange={(e) => {
@@ -3838,161 +3802,59 @@ const AdminDashboard = () => {
                 </div>
               </div>
               
-              {/* View Content */}
-              {viewMode === 'table' ? (
-                /* Table View */
-                <div style={{ 
-                  overflowX: 'auto',
-                  maxWidth: '100%',
-                  position: 'relative'
+              {/* Table View */}
+              <div style={{ 
+                overflowX: 'auto',
+                maxWidth: '100%',
+                position: 'relative'
+              }}>
+                <table style={{ 
+                  width: '100%', 
+                  borderCollapse: 'collapse',
+                  minWidth: '800px' // Ensure minimum width for proper layout
                 }}>
-                  <table style={{ 
-                    width: '100%', 
-                    borderCollapse: 'collapse',
-                    minWidth: '800px' // Ensure minimum width for proper layout
-                  }}>
-                    <thead>
-                      <tr style={{ background: 'var(--background-alt)' }}>
-                        <th style={{ 
-                          padding: '1rem', 
-                          textAlign: 'left', 
-                          borderBottom: '2px solid var(--border-color)',
-                          fontWeight: '600',
+                  <thead>
+                    <tr style={{ background: 'var(--background-alt)' }}>
+                      <th style={{ 
+                        padding: '1rem', 
+                        textAlign: 'left', 
+                        borderBottom: '2px solid var(--border-color)',
+                        fontWeight: '600',
+                        position: 'sticky',
+                        left: 0,
+                        background: 'var(--background-alt)',
+                        zIndex: 1
+                      }}>
+                        Employee
+                      </th>
+                      <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Present Days</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Leave Days</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Total Hours</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Avg Hours</th>
+                      <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Attendance Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthlyAttendance.filter(empData => !isAdmin(empData.employee)).map((employeeData, index) => (
+                      <tr key={employeeData.employee.id} style={{
+                        background: index % 2 === 0 ? 'white' : 'var(--background-alt)',
+                        transition: 'background 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = index % 2 === 0 ? 'white' : 'var(--background-alt)'}
+                      >
+                        <td style={{
+                          padding: '1rem',
+                          borderBottom: '1px solid var(--border-color)',
                           position: 'sticky',
                           left: 0,
-                          background: 'var(--background-alt)',
+                          background: 'inherit',
                           zIndex: 1
                         }}>
-                          Employee
-                        </th>
-                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Present Days</th>
-                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Leave Days</th>
-                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Total Hours</th>
-                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Avg Hours</th>
-                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid var(--border-color)', fontWeight: '600' }}>Attendance Rate</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {monthlyAttendance.filter(empData => !isAdmin(empData.employee)).map((employeeData, index) => (
-                        <tr key={employeeData.employee.id} style={{
-                          background: index % 2 === 0 ? 'white' : 'var(--background-alt)',
-                          transition: 'background 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = index % 2 === 0 ? 'white' : 'var(--background-alt)'}
-                        >
-                          <td style={{
-                            padding: '1rem',
-                            borderBottom: '1px solid var(--border-color)',
-                            position: 'sticky',
-                            left: 0,
-                            background: 'inherit',
-                            zIndex: 1
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                              <div style={{
-                                width: '40px',
-                                height: '40px',
-                                borderRadius: '50%',
-                                background: 'linear-gradient(135deg, var(--primary-color), #6366f1)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: 'white',
-                                fontWeight: 'bold',
-                                fontSize: '0.875rem'
-                              }}>
-                                {employeeData.employee.name.split(' ').map(n => n[0]).join('')}
-                              </div>
-                              <div>
-                                <div style={{ fontWeight: '600', fontSize: '0.875rem' }}>
-                                  {employeeData.employee.name}
-                                </div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                  {employeeData.employee.department}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid var(--border-color)' }}>
-                            <span style={{ 
-                              background: 'var(--success-color)', 
-                              color: 'white', 
-                              padding: '0.25rem 0.75rem', 
-                              borderRadius: '1rem', 
-                              fontSize: '0.875rem',
-                              fontWeight: '600'
-                            }}>
-                              {employeeData.summary.presentDays}
-                            </span>
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid var(--border-color)' }}>
-                            <span style={{ 
-                              background: employeeData.summary.leaveDays > 0 ? '#3b82f6' : 'var(--text-secondary)', 
-                              color: 'white', 
-                              padding: '0.25rem 0.75rem', 
-                              borderRadius: '1rem', 
-                              fontSize: '0.875rem',
-                              fontWeight: '600'
-                            }}>
-                              {employeeData.summary.leaveDays}
-                            </span>
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid var(--border-color)' }}>
-                            <span style={{ fontWeight: '600', color: 'var(--primary-color)' }}>
-                              {convertDecimalToHoursMinutes(parseFloat(employeeData.summary.totalHours))}
-                            </span>
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid var(--border-color)' }}>
-                            <span style={{ fontWeight: '600' }}>
-                              {convertDecimalToHoursMinutes(parseFloat(employeeData.summary.avgHours))}
-                            </span>
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid var(--border-color)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                              <div style={{
-                                width: '60px',
-                                height: '8px',
-                                background: 'var(--border-color)',
-                                borderRadius: '4px',
-                                overflow: 'hidden'
-                              }}>
-                                <div style={{
-                                  width: `${employeeData.summary.attendanceRate}%`,
-                                  height: '100%',
-                                  background: parseFloat(employeeData.summary.attendanceRate) >= 90 ? 'var(--success-color)' : 
-                                             parseFloat(employeeData.summary.attendanceRate) >= 75 ? '#f59e0b' : 'var(--danger-color)',
-                                  transition: 'width 0.3s ease'
-                                }} />
-                              </div>
-                              <span style={{ fontWeight: '600', fontSize: '0.875rem' }}>
-                                {employeeData.summary.attendanceRate}%
-                              </span>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                /* Calendar View */
-                <div style={{ overflowX: 'auto' }}>
-                  {monthlyAttendance.filter(empData => !isAdmin(empData.employee)).map((empData) => (
-                    <div key={empData.employee.id} style={{ marginBottom: '2rem' }}>
-                      {/* Employee Header */}
-                      <div style={{
-                        background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
-                        padding: '1rem 1.5rem',
-                        borderRadius: '0.75rem 0.75rem 0 0',
-                        border: '1px solid var(--border-color)',
-                        borderBottom: 'none'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                             <div style={{
-                              width: '48px',
-                              height: '48px',
+                              width: '40px',
+                              height: '40px',
                               borderRadius: '50%',
                               background: 'linear-gradient(135deg, var(--primary-color), #6366f1)',
                               display: 'flex',
@@ -4000,155 +3862,81 @@ const AdminDashboard = () => {
                               justifyContent: 'center',
                               color: 'white',
                               fontWeight: 'bold',
-                              fontSize: '1rem'
+                              fontSize: '0.875rem'
                             }}>
-                              {empData.employee.name.split(' ').map(n => n[0]).join('')}
+                              {employeeData.employee.name.split(' ').map(n => n[0]).join('')}
                             </div>
                             <div>
-                              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', margin: 0, marginBottom: '0.25rem' }}>
-                                {empData.employee.name}
-                              </h3>
-                              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                                {empData.employee.department} - {empData.employee.role}
-                              </p>
+                              <div style={{ fontWeight: '600', fontSize: '0.875rem' }}>
+                                {employeeData.employee.name}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                {employeeData.employee.department}
+                              </div>
                             </div>
                           </div>
-                          <div style={{ display: 'flex', gap: '2rem', textAlign: 'center' }}>
-                            <div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--success-color)' }}>
-                                {empData.summary.presentDays}
-                              </div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Present Days</div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--warning-color)' }}>
-                                {empData.summary.leaveDays}
-                              </div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Leave Days</div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--primary-color)' }}>
-                                {convertDecimalToHoursMinutes(parseFloat(empData.summary.avgHours))}
-                              </div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Avg Hours</div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#8b5cf6' }}>
-                                {empData.summary.attendanceRate}%
-                              </div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Attendance</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Attendance Calendar Grid */}
-                      <div style={{
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '0 0 0.75rem 0.75rem',
-                        overflow: 'hidden'
-                      }}>
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(7, 1fr)',
-                          gap: '1px',
-                          background: 'var(--border-color)'
-                        }}>
-                          {/* Day headers */}
-                          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                            <div key={day} style={{
-                              background: 'var(--background)',
-                              padding: '0.75rem',
-                              textAlign: 'center',
-                              fontWeight: '600',
-                              fontSize: '0.75rem',
-                              color: 'var(--text-secondary)'
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid var(--border-color)' }}>
+                          <span style={{ 
+                            background: 'var(--success-color)', 
+                            color: 'white', 
+                            padding: '0.25rem 0.75rem', 
+                            borderRadius: '1rem', 
+                            fontSize: '0.875rem',
+                            fontWeight: '600'
+                          }}>
+                            {employeeData.summary.presentDays}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid var(--border-color)' }}>
+                          <span style={{ 
+                            background: employeeData.summary.leaveDays > 0 ? '#3b82f6' : 'var(--text-secondary)', 
+                            color: 'white', 
+                            padding: '0.25rem 0.75rem', 
+                            borderRadius: '1rem', 
+                            fontSize: '0.875rem',
+                            fontWeight: '600'
+                          }}>
+                            {employeeData.summary.leaveDays}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid var(--border-color)' }}>
+                          <span style={{ fontWeight: '600', color: 'var(--primary-color)' }}>
+                            {convertDecimalToHoursMinutes(parseFloat(employeeData.summary.totalHours))}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid var(--border-color)' }}>
+                          <span style={{ fontWeight: '600' }}>
+                            {convertDecimalToHoursMinutes(parseFloat(employeeData.summary.avgHours))}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid var(--border-color)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                            <div style={{
+                              width: '60px',
+                              height: '8px',
+                              background: 'var(--border-color)',
+                              borderRadius: '4px',
+                              overflow: 'hidden'
                             }}>
-                              {day}
+                              <div style={{
+                                width: `${employeeData.summary.attendanceRate}%`,
+                                height: '100%',
+                                background: parseFloat(employeeData.summary.attendanceRate) >= 90 ? 'var(--success-color)' : 
+                                           parseFloat(employeeData.summary.attendanceRate) >= 75 ? '#f59e0b' : 'var(--danger-color)',
+                                transition: 'width 0.3s ease'
+                              }} />
                             </div>
-                          ))}
-                          
-                          {/* Calendar days */}
-                          {Array.from({ length: 42 }, (_, i) => {
-                            const firstDay = new Date(selectedYear, selectedMonth, 1).getDay();
-                            const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-                            const day = i - firstDay + 1;
-                            
-                            if (day < 1 || day > daysInMonth) {
-                              return (
-                                <div key={i} style={{
-                                  background: 'var(--background-alt)',
-                                  minHeight: '80px'
-                                }} />
-                              );
-                            }
-                            
-                            const record = empData.attendanceRecords.find(r => r.date === day);
-                            const isToday = day === new Date().getDate() && 
-                                           selectedMonth === new Date().getMonth() && 
-                                           selectedYear === new Date().getFullYear();
-                            
-                            return (
-                              <div key={i} style={{
-                                background: 'white',
-                                minHeight: '80px',
-                                padding: '0.5rem',
-                                position: 'relative',
-                                border: isToday ? '2px solid var(--primary-color)' : 'none'
-                              }}>
-                                <div style={{ 
-                                  fontSize: '0.875rem', 
-                                  fontWeight: isToday ? '700' : '500',
-                                  marginBottom: '0.25rem'
-                                }}>
-                                  {day}
-                                </div>
-                                {record && (
-                                  <div>
-                                    <div style={{
-                                      fontSize: '0.625rem',
-                                      padding: '0.125rem 0.25rem',
-                                      borderRadius: '0.25rem',
-                                      marginBottom: '0.25rem',
-                                      background: 
-                                        record.status === 'present' ? '#d1fae5' :
-                                        record.status === 'late' ? '#fef3c7' :
-                                        record.status === 'absent' ? '#fee2e2' :
-                                        record.status === 'leave' ? '#dbeafe' : '#f3f4f6',
-                                      color:
-                                        record.status === 'present' ? '#065f46' :
-                                        record.status === 'late' ? '#92400e' :
-                                        record.status === 'absent' ? '#991b1b' :
-                                        record.status === 'leave' ? '#1e40af' : '#6b7280'
-                                    }}>
-                                      {record.status === 'weekend' ? 'OFF' : record.status.toUpperCase()}
-                                    </div>
-                                    {record.inTime && (
-                                      <div style={{ fontSize: '0.625rem', color: 'var(--text-secondary)' }}>
-                                        In: {record.inTime}
-                                      </div>
-                                    )}
-                                    {record.outTime && (
-                                      <div style={{ fontSize: '0.625rem', color: 'var(--text-secondary)' }}>
-                                        Out: {record.outTime}
-                                      </div>
-                                    )}
-                                    {record.hoursWorked && record.hoursWorked !== '0' && (
-                                      <div style={{ fontSize: '0.625rem', fontWeight: '600', color: 'var(--primary-color)' }}>
-                                        {convertDecimalToHoursMinutes(parseFloat(record.hoursWorked))}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                            <span style={{ fontWeight: '600', fontSize: '0.875rem' }}>
+                              {employeeData.summary.attendanceRate}%
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
