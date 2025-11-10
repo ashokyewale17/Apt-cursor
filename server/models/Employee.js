@@ -62,6 +62,27 @@ const employeeSchema = new mongoose.Schema({
     trim: true,
     maxlength: [200, 'Address cannot exceed 200 characters']
   },
+  employeeId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true,
+    maxlength: [50, 'Employee ID cannot exceed 50 characters']
+  },
+  birthDate: {
+    type: Date
+  },
+  companyEmail: {
+    type: String,
+    lowercase: true,
+    trim: true,
+    validate: {
+      validator: function(v) {
+        return !v || validator.isEmail(v);
+      },
+      message: 'Please provide a valid company email'
+    }
+  },
   dateOfJoining: {
     type: Date,
     default: Date.now

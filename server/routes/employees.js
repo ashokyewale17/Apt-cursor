@@ -98,7 +98,7 @@ router.get('/:id', authenticateToken, requireAdminOrSelf, async (req, res) => {
 // @access  Private (Admin)
 router.post('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { name, email, password, role, position, department, salary, phone, address } = req.body;
+    const { name, email, password, role, position, department, salary, phone, address, employeeId, birthDate, companyEmail, dateOfJoining } = req.body;
     
     // Check if employee with email already exists
     const existingEmployee = await Employee.findOne({ email, isActive: true });
@@ -115,7 +115,11 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
       department,
       salary,
       phone,
-      address
+      address,
+      employeeId,
+      birthDate: birthDate ? new Date(birthDate) : undefined,
+      companyEmail,
+      dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : undefined
     });
     
     await employee.save();
@@ -158,7 +162,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
 // @access  Private
 router.put('/:id', authenticateToken, requireAdminOrSelf, async (req, res) => {
   try {
-    const { name, email, position, department, salary, phone, address, role, isActive } = req.body;
+    const { name, email, position, department, salary, phone, address, role, isActive, employeeId, birthDate, companyEmail, dateOfJoining } = req.body;
     
     // Check if another employee with the same email exists
     if (email) {
@@ -188,7 +192,11 @@ router.put('/:id', authenticateToken, requireAdminOrSelf, async (req, res) => {
       ...(department && { department }),
       ...(salary !== undefined && { salary }),
       ...(phone && { phone }),
-      ...(address && { address })
+      ...(address && { address }),
+      ...(employeeId !== undefined && { employeeId }),
+      ...(birthDate && { birthDate: new Date(birthDate) }),
+      ...(companyEmail !== undefined && { companyEmail }),
+      ...(dateOfJoining && { dateOfJoining: new Date(dateOfJoining) })
     };
     
     // Only admin can change roles and status

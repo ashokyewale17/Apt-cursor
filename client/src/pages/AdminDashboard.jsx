@@ -6,7 +6,7 @@ import {
   Users, Clock, FileText, TrendingUp, AlertCircle, CheckCircle, Calendar, Timer,
   BarChart3, DollarSign, Target, Award, Activity, Settings, RefreshCw, Download,
   Filter, Search, Plus, ArrowUpRight, ArrowDownRight, Eye, Edit, Trash2,
-  MapPin, Phone, Mail, Star, Briefcase, UserPlus, GitBranch, PieChart, TrendingDown, Edit3, X
+  MapPin, Phone, Mail, Star, Briefcase, UserPlus, GitBranch, PieChart, TrendingDown, Edit3, X, Save
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, isToday, isThisWeek, startOfWeek, endOfWeek } from 'date-fns';
 
@@ -388,6 +388,9 @@ const AdminDashboard = () => {
             role: e.role,
             salary: e.salary,
             dateOfJoining: e.dateOfJoining,
+            employeeId: e.employeeId,
+            birthDate: e.birthDate,
+            companyEmail: e.companyEmail,
             isActive: e.isActive,
             status: e.isActive ? 'active' : 'inactive'
           }));
@@ -1304,10 +1307,13 @@ const AdminDashboard = () => {
     setSelectedEmployee(employee);
   };
 
-  const handleEmployeeSave = (updatedEmployee) => {
-    const updatedEmployees = realEmployees.map(emp => 
-      emp.id === updatedEmployee.id ? updatedEmployee : emp
-    );
+  const handleEmployeeSave = async (updatedEmployee) => {
+    // Update local state
+    const updatedEmployees = realEmployees.map(emp => {
+      const empId = emp._id || emp.id;
+      const updatedId = updatedEmployee._id || updatedEmployee.id;
+      return empId === updatedId ? { ...emp, ...updatedEmployee } : emp;
+    });
     setRealEmployees(updatedEmployees);
     setEmployeeStatus(updatedEmployees);
     setSelectedEmployee(null);
@@ -1318,6 +1324,9 @@ const AdminDashboard = () => {
     } catch (error) {
       console.log('Failed to save employee data to localStorage:', error);
     }
+    
+    // Reload employee data from database to ensure sync
+    await loadDashboardData();
   };
 
   const handleEmployeeDelete = (employeeId) => {
@@ -3444,10 +3453,10 @@ const AdminDashboard = () => {
                 <thead>
                   <tr style={{ backgroundColor: 'var(--background-alt)' }}>
                     <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Employee</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Employee ID</th>
                     <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Contact</th>
                     <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Position</th>
                     <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Department</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Role</th>
                     <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Join Date</th>
                     <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Status</th>
                     <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Actions</th>
@@ -3905,15 +3914,253 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
     }
   };
 
+  const handleSave = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const employeeId = employee._id || employee.id;
+      
+      const response = await fetch(`/api/employees/${employeeId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: editData.name,
+          email: editData.email,
+          phone: editData.phone,
+          address: editData.address,
+          position: editData.position,
+          department: editData.department,
+          employeeId: editData.employeeId,
+          birthDate: editData.birthDate ? format(editData.birthDate, 'yyyy-MM-dd') : undefined,
+          companyEmail: editData.companyEmail,
+          dateOfJoining: editData.dateOfJoining ? format(editData.dateOfJoining, 'yyyy-MM-dd') : undefined
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update employee');
+      }
+
+      const updatedEmployee = await response.json();
+      onSave(updatedEmployee);
+      alert('Employee updated successfully!');
+    } catch (error) {
+      console.error('Error updating employee:', error);
+      alert(error.message || 'Failed to update employee. Please try again.');
+    }
+  };
+
   if (isEditing) {
     return (
       <tr style={{ backgroundColor: '#fffbeb' }}>
-        <td colSpan="8" style={{ padding: '1rem' }}>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <span style={{ fontWeight: '600' }}>Editing: {employee.name}</span>
-            <button onClick={() => onEdit(null)} className="btn btn-sm btn-outline">
-              Cancel Edit
-            </button>
+        <td colSpan="8" style={{ padding: '1.5rem' }}>
+          <div style={{ 
+            background: 'white', 
+            borderRadius: '12px', 
+            padding: '2rem',
+            border: '2px solid var(--primary-color)',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600', color: 'var(--primary-color)' }}>
+                Editing: {employee.name}
+              </h3>
+              <button 
+                onClick={() => {
+                  setEditData(employee);
+                  onEdit(null);
+                }} 
+                className="btn btn-sm btn-outline"
+                style={{ padding: '0.5rem 1rem' }}
+              >
+                Cancel
+              </button>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+              {/* Name */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                  Employee Name *
+                </label>
+                <input
+                  type="text"
+                  value={editData.name || ''}
+                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  className="form-control"
+                  required
+                  style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                />
+              </div>
+
+              {/* Employee ID */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                  Employee ID
+                </label>
+                <input
+                  type="text"
+                  value={editData.employeeId || ''}
+                  onChange={(e) => setEditData({ ...editData, employeeId: e.target.value })}
+                  className="form-control"
+                  style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                  placeholder="EMP001"
+                />
+              </div>
+
+              {/* Contact Number */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                  Contact Number *
+                </label>
+                <input
+                  type="tel"
+                  value={editData.phone || ''}
+                  onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                  className="form-control"
+                  required
+                  style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  value={editData.email || ''}
+                  onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                  className="form-control"
+                  required
+                  style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                />
+              </div>
+
+              {/* Company Email */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                  Company Mail ID
+                </label>
+                <input
+                  type="email"
+                  value={editData.companyEmail || ''}
+                  onChange={(e) => setEditData({ ...editData, companyEmail: e.target.value })}
+                  className="form-control"
+                  style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                  placeholder="employee@company.com"
+                />
+              </div>
+
+              {/* Birth Date */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                  Birth Date
+                </label>
+                <input
+                  type="date"
+                  value={editData.birthDate ? format(new Date(editData.birthDate), 'yyyy-MM-dd') : ''}
+                  onChange={(e) => setEditData({ ...editData, birthDate: e.target.value ? new Date(e.target.value) : null })}
+                  className="form-control"
+                  style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                />
+              </div>
+
+              {/* Joining Date */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                  Joining Date *
+                </label>
+                <input
+                  type="date"
+                  value={editData.dateOfJoining ? format(new Date(editData.dateOfJoining), 'yyyy-MM-dd') : ''}
+                  onChange={(e) => setEditData({ ...editData, dateOfJoining: e.target.value ? new Date(e.target.value) : null })}
+                  className="form-control"
+                  required
+                  style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                />
+              </div>
+
+              {/* Department */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                  Department *
+                </label>
+                <select
+                  value={editData.department || ''}
+                  onChange={(e) => setEditData({ ...editData, department: e.target.value })}
+                  className="form-control form-select"
+                  required
+                  style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                >
+                  <option value="">Select Department</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Software">Software</option>
+                  <option value="Testing">Testing</option>
+                  <option value="Operations">Operations</option>
+                  <option value="Design">Design</option>
+                  <option value="Embedded">Embedded</option>
+                </select>
+              </div>
+
+              {/* Position */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                  Position *
+                </label>
+                <input
+                  type="text"
+                  value={editData.position || ''}
+                  onChange={(e) => setEditData({ ...editData, position: e.target.value })}
+                  className="form-control"
+                  required
+                  style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                  placeholder="Software Developer"
+                />
+              </div>
+
+              {/* Address */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                  Address *
+                </label>
+                <textarea
+                  value={editData.address || ''}
+                  onChange={(e) => setEditData({ ...editData, address: e.target.value })}
+                  className="form-control"
+                  required
+                  rows={3}
+                  style={{ padding: '0.75rem', fontSize: '0.875rem', resize: 'vertical' }}
+                  placeholder="Enter address"
+                />
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => {
+                  setEditData(employee);
+                  onEdit(null);
+                }}
+                className="btn btn-outline"
+                style={{ padding: '0.75rem 1.5rem' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleSave}
+                className="btn btn-primary"
+                style={{ padding: '0.75rem 1.5rem' }}
+              >
+                <Save size={16} style={{ marginRight: '0.5rem' }} />
+                Save Changes
+              </button>
+            </div>
           </div>
         </td>
       </tr>
@@ -3948,8 +4195,26 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
           <div>
             <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>{employee.name || 'N/A'}</div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{employee.email || 'N/A'}</div>
+            {employee.companyEmail && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                <Mail size={10} style={{ display: 'inline', marginRight: '0.25rem' }} />
+                {employee.companyEmail}
+              </div>
+            )}
           </div>
         </div>
+      </td>
+      
+      {/* Employee ID */}
+      <td style={{ padding: '1rem' }}>
+        <div style={{ fontSize: '0.875rem', fontWeight: '600', fontFamily: 'monospace', color: 'var(--primary-color)' }}>
+          {employee.employeeId || 'N/A'}
+        </div>
+        {employee.birthDate && (
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+            DOB: {formatDate(employee.birthDate)}
+          </div>
+        )}
       </td>
       
       {/* Contact */}
@@ -3967,7 +4232,7 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
       
       {/* Position */}
       <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>
-        {employee.position || employee.role || 'N/A'}
+        {employee.position || 'N/A'}
       </td>
       
       {/* Department */}
@@ -3981,21 +4246,6 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
           fontWeight: '500'
         }}>
           {employee.department || 'N/A'}
-        </span>
-      </td>
-      
-      {/* Role */}
-      <td style={{ padding: '1rem' }}>
-        <span style={{
-          padding: '0.25rem 0.75rem',
-          backgroundColor: employee.role === 'admin' ? '#ef4444' : '#10b981',
-          color: 'white',
-          borderRadius: '0.25rem',
-          fontSize: '0.75rem',
-          fontWeight: '500',
-          textTransform: 'capitalize'
-        }}>
-          {employee.role || 'employee'}
         </span>
       </td>
       

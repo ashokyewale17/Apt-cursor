@@ -15,7 +15,9 @@ const AddEmployee = () => {
     password: "",
     confirmPassword: "",
     hireDate: "",
-    address: ""
+    address: "",
+    birthDate: "",
+    companyEmail: ""
   });
 
   const [message, setMessage] = useState("");
@@ -55,15 +57,17 @@ const AddEmployee = () => {
         body: JSON.stringify({
           name: formData.name,
           email: formData.email,
-          // employeeId is not part of schema; omit to avoid validation issues
+          employeeId: formData.employeeId,
           department: formData.department,
           position: formData.position,
           phone: formData.phone,
           role: (formData.role || 'Employee').toLowerCase() === 'admin' ? 'admin' : 'employee',
           password: formData.password,
-          // hireDate maps to Employee.dateOfJoining if needed; backend sets default
+          dateOfJoining: formData.hireDate || new Date().toISOString().split('T')[0],
           salary: 0, // Default salary value
-          address: formData.address
+          address: formData.address,
+          birthDate: formData.birthDate || undefined,
+          companyEmail: formData.companyEmail || undefined
         }),
       });
 
@@ -80,7 +84,9 @@ const AddEmployee = () => {
           password: "",
           confirmPassword: "",
           hireDate: "",
-          address: ""
+          address: "",
+          birthDate: "",
+          companyEmail: ""
         });
         // Navigate back to dashboard after 2 seconds
         setTimeout(() => {
@@ -231,13 +237,36 @@ const AddEmployee = () => {
 
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                    Phone Number
+                    Company Mail ID
+                  </label>
+                  <input
+                    type="email"
+                    name="companyEmail"
+                    value={formData.companyEmail}
+                    onChange={handleChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      background: '#ffffff',
+                      color: '#1f2937'
+                    }}
+                    placeholder="employee@company.com"
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    Phone Number *
                   </label>
                   <input
                     type="tel"
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
+                    required
                     style={{
                       width: '100%',
                       padding: '0.75rem',
@@ -253,13 +282,35 @@ const AddEmployee = () => {
 
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                    Address
+                    Birth Date
+                  </label>
+                  <input
+                    type="date"
+                    name="birthDate"
+                    value={formData.birthDate}
+                    onChange={handleChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      background: '#ffffff',
+                      color: '#1f2937'
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    Address *
                   </label>
                   <textarea
                     name="address"
                     value={formData.address}
                     onChange={handleChange}
                     rows={3}
+                    required
                     style={{
                       width: '100%',
                       padding: '0.75rem',

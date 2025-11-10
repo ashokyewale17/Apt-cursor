@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { User, Mail, Phone, MapPin, Calendar, Edit, Save, X, Shield, Clock, Eye, EyeOff, Smartphone, Key, History, CheckCircle, BarChart3, Users, FileText } from 'lucide-react';
+import { format } from 'date-fns';
 
 const Profile = () => {
   const { user, logout, updateUser } = useAuth();
@@ -59,6 +60,9 @@ const Profile = () => {
           position: userData.position || '',
           department: userData.department || '',
           role: userData.role || 'employee',
+          employeeId: userData.employeeId || '',
+          birthDate: userData.birthDate || null,
+          companyEmail: userData.companyEmail || '',
           _id: userData._id
         });
         
@@ -71,6 +75,9 @@ const Profile = () => {
           position: userData.position || '',
           department: userData.department || '',
           role: userData.role || 'employee',
+          employeeId: userData.employeeId || '',
+          birthDate: userData.birthDate || null,
+          companyEmail: userData.companyEmail || '',
           _id: userData._id
         });
       } catch (err) {
@@ -117,7 +124,11 @@ const Profile = () => {
           name: tempProfileData.name,
           email: tempProfileData.email,
           phone: tempProfileData.phone,
-          address: tempProfileData.address
+          address: tempProfileData.address,
+          employeeId: tempProfileData.employeeId,
+          birthDate: tempProfileData.birthDate ? format(new Date(tempProfileData.birthDate), 'yyyy-MM-dd') : undefined,
+          companyEmail: tempProfileData.companyEmail,
+          dateOfJoining: tempProfileData.dateOfJoining ? format(new Date(tempProfileData.dateOfJoining), 'yyyy-MM-dd') : undefined
         })
       });
 
@@ -134,7 +145,11 @@ const Profile = () => {
         name: updatedEmployee.name,
         email: updatedEmployee.email,
         phone: updatedEmployee.phone,
-        address: updatedEmployee.address
+        address: updatedEmployee.address,
+        employeeId: updatedEmployee.employeeId,
+        birthDate: updatedEmployee.birthDate,
+        companyEmail: updatedEmployee.companyEmail,
+        dateOfJoining: updatedEmployee.dateOfJoining
       });
       
       // Update auth context
@@ -143,7 +158,11 @@ const Profile = () => {
         name: updatedEmployee.name,
         email: updatedEmployee.email,
         phone: updatedEmployee.phone,
-        address: updatedEmployee.address
+        address: updatedEmployee.address,
+        employeeId: updatedEmployee.employeeId,
+        birthDate: updatedEmployee.birthDate,
+        companyEmail: updatedEmployee.companyEmail,
+        dateOfJoining: updatedEmployee.dateOfJoining
       });
       
       setIsEditing(false);
@@ -744,16 +763,118 @@ const Profile = () => {
                   marginBottom: '0.75rem',
                   color: '#0369a1'
                 }}>Employee ID</label>
-                <p style={{ 
-                  margin: 0, 
-                  fontWeight: '700', 
-                  fontFamily: 'monospace',
-                  fontSize: '1.5rem',
-                  color: '#0369a1',
-                  letterSpacing: '0.1em'
+                {isEditing ? (
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={tempProfileData.employeeId || ''}
+                    onChange={(e) => handleInputChange('employeeId', e.target.value)}
+                    style={{
+                      padding: '0.875rem',
+                      fontSize: '1rem',
+                      border: '2px solid var(--border-color)',
+                      borderRadius: '8px',
+                      fontFamily: 'monospace'
+                    }}
+                    placeholder="EMP001"
+                  />
+                ) : (
+                  <p style={{ 
+                    margin: 0, 
+                    fontWeight: '700', 
+                    fontFamily: 'monospace',
+                    fontSize: '1.5rem',
+                    color: '#0369a1',
+                    letterSpacing: '0.1em'
+                  }}>
+                    {profileData.employeeId || `EMP-${(user._id || user.id || '').toString().slice(-4).padStart(4, '0')}`}
+                  </p>
+                )}
+              </div>
+
+              <div style={{
+                padding: '1.5rem',
+                background: 'var(--background-alt)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)'
+              }}>
+                <label className="form-label" style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                  fontWeight: '600',
+                  marginBottom: '0.75rem',
+                  color: 'var(--text-primary)'
                 }}>
-                  EMP-{(user._id || user.id || '').toString().slice(-4).padStart(4, '0')}
-                </p>
+                  <Mail size={16} />
+                  Company Mail ID
+                </label>
+                {isEditing ? (
+                  <input
+                    type="email"
+                    className="form-control"
+                    value={tempProfileData.companyEmail || ''}
+                    onChange={(e) => handleInputChange('companyEmail', e.target.value)}
+                    style={{
+                      padding: '0.875rem',
+                      fontSize: '1rem',
+                      border: '2px solid var(--border-color)',
+                      borderRadius: '8px'
+                    }}
+                    placeholder="employee@company.com"
+                  />
+                ) : (
+                  <p style={{ 
+                    margin: 0, 
+                    fontWeight: '500', 
+                    fontSize: '1.1rem',
+                    color: 'var(--text-primary)'
+                  }}>
+                    {profileData.companyEmail || 'N/A'}
+                  </p>
+                )}
+              </div>
+
+              <div style={{
+                padding: '1.5rem',
+                background: 'var(--background-alt)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)'
+              }}>
+                <label className="form-label" style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                  fontWeight: '600',
+                  marginBottom: '0.75rem',
+                  color: 'var(--text-primary)'
+                }}>
+                  <Calendar size={16} />
+                  Birth Date
+                </label>
+                {isEditing ? (
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={tempProfileData.birthDate ? format(new Date(tempProfileData.birthDate), 'yyyy-MM-dd') : ''}
+                    onChange={(e) => handleInputChange('birthDate', e.target.value ? new Date(e.target.value) : null)}
+                    style={{
+                      padding: '0.875rem',
+                      fontSize: '1rem',
+                      border: '2px solid var(--border-color)',
+                      borderRadius: '8px'
+                    }}
+                  />
+                ) : (
+                  <p style={{ 
+                    margin: 0, 
+                    fontWeight: '500', 
+                    fontSize: '1.1rem',
+                    color: 'var(--text-primary)'
+                  }}>
+                    {profileData.birthDate ? formatDate(profileData.birthDate) : 'N/A'}
+                  </p>
+                )}
               </div>
 
               <div style={{
@@ -819,14 +940,29 @@ const Profile = () => {
                   <Calendar size={16} />
                   Date of Joining
                 </label>
-                <p style={{ 
-                  margin: 0, 
-                  fontWeight: '500', 
-                  fontSize: '1.1rem',
-                  color: 'var(--text-primary)'
-                }}>
-                  {formatDate(profileData.dateOfJoining)}
-                </p>
+                {isEditing ? (
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={tempProfileData.dateOfJoining ? format(new Date(tempProfileData.dateOfJoining), 'yyyy-MM-dd') : ''}
+                    onChange={(e) => handleInputChange('dateOfJoining', e.target.value ? new Date(e.target.value) : null)}
+                    style={{
+                      padding: '0.875rem',
+                      fontSize: '1rem',
+                      border: '2px solid var(--border-color)',
+                      borderRadius: '8px'
+                    }}
+                  />
+                ) : (
+                  <p style={{ 
+                    margin: 0, 
+                    fontWeight: '500', 
+                    fontSize: '1.1rem',
+                    color: 'var(--text-primary)'
+                  }}>
+                    {formatDate(profileData.dateOfJoining)}
+                  </p>
+                )}
               </div>
 
               <div style={{
