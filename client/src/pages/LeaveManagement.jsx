@@ -978,7 +978,17 @@ const LeaveManagement = () => {
                       type="date"
                       className="form-control"
                       value={leaveForm.startDate}
-                      onChange={(e) => setLeaveForm(prev => ({ ...prev, startDate: e.target.value }))}
+                      min={format(new Date(), 'yyyy-MM-dd')}
+                      onChange={(e) => {
+                        const newStartDate = e.target.value;
+                        setLeaveForm(prev => {
+                          // If new start date is after current end date, adjust end date
+                          const newEndDate = new Date(newStartDate) > new Date(prev.endDate) 
+                            ? newStartDate 
+                            : prev.endDate;
+                          return { ...prev, startDate: newStartDate, endDate: newEndDate };
+                        });
+                      }}
                       required
                     />
                   </div>
@@ -989,7 +999,17 @@ const LeaveManagement = () => {
                       type="date"
                       className="form-control"
                       value={leaveForm.endDate}
-                      onChange={(e) => setLeaveForm(prev => ({ ...prev, endDate: e.target.value }))}
+                      min={leaveForm.startDate}
+                      onChange={(e) => {
+                        const newEndDate = e.target.value;
+                        // Ensure end date is not before start date
+                        if (new Date(newEndDate) >= new Date(leaveForm.startDate)) {
+                          setLeaveForm(prev => ({ ...prev, endDate: newEndDate }));
+                        } else {
+                          // Reset to start date if invalid
+                          setLeaveForm(prev => ({ ...prev, endDate: prev.startDate }));
+                        }
+                      }}
                       required
                     />
                   </div>
@@ -1439,7 +1459,15 @@ const LeaveManagement = () => {
                                 <div style={{ fontWeight: '600', textTransform: 'capitalize' }}>
                                   {leave.type} Leave
                                 </div>
-                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                {user.role === 'admin' && leave.employee && (
+                                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                                    <div style={{ fontWeight: '500' }}>{leave.employee.name}</div>
+                                    {leave.employee.department && (
+                                      <div style={{ fontSize: '0.75rem' }}>{leave.employee.department}</div>
+                                    )}
+                                  </div>
+                                )}
+                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                                   {leave.period}
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: '#f59e0b', marginTop: '0.25rem' }}>
@@ -1561,7 +1589,15 @@ const LeaveManagement = () => {
                                 <div style={{ fontWeight: '600', textTransform: 'capitalize' }}>
                                   {leave.type} Leave
                                 </div>
-                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                {user.role === 'admin' && leave.employee && (
+                                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                                    <div style={{ fontWeight: '500' }}>{leave.employee.name}</div>
+                                    {leave.employee.department && (
+                                      <div style={{ fontSize: '0.75rem' }}>{leave.employee.department}</div>
+                                    )}
+                                  </div>
+                                )}
+                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                                   {leave.period}
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: '#8b5cf6', marginTop: '0.25rem' }}>

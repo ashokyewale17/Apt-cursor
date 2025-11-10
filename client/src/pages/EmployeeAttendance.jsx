@@ -118,7 +118,6 @@ const EmployeeAttendance = () => {
         // Handle days with attendance records
         if (record) {
           const dbStatus = record.status || 'Present';
-          const isCompOffDay = record.compOff === true || dbStatus === 'CompOff';
           let status = 'absent';
           let checkIn = null;
           let checkOut = null;
@@ -131,27 +130,6 @@ const EmployeeAttendance = () => {
           } else if (dbStatus === 'Absent') {
             status = 'absent';
             notes = 'Absent';
-          } else if (isCompOffDay) {
-            // Comp off day - show as completed with comp off note
-            if (record.inTime) {
-              checkIn = new Date(record.inTime);
-              if (record.outTime) {
-                checkOut = new Date(record.outTime);
-                const diffMs = checkOut - checkIn;
-                const hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
-                const hours = Math.floor(hoursWorked);
-                const minutes = Math.round((hoursWorked - hours) * 60);
-                totalHours = `${hours}h ${minutes}m`;
-                status = 'completed';
-                notes = 'Comp Off';
-              } else {
-                status = isToday ? 'active' : 'completed';
-                notes = 'Comp Off';
-              }
-            } else {
-              status = 'weekend';
-              notes = 'Weekend';
-            }
           } else if (record.inTime) {
             // Has check-in time
             checkIn = new Date(record.inTime);
@@ -338,7 +316,7 @@ const EmployeeAttendance = () => {
       const isSaturday = d.date.getDay() === 6;
       const dayKey = format(d.date, 'yyyy-MM-dd');
       const isWorkingSaturday = isSaturday && workingSaturdaySet.has(dayKey);
-      return (d.status === 'completed' || d.status === 'active') && (!isWeekendDay || isWorkingSaturday) && d.notes !== 'Comp Off';
+      return (d.status === 'completed' || d.status === 'active') && (!isWeekendDay || isWorkingSaturday);
     }).length;
     
     const absentDays = data.filter(d => {
@@ -349,7 +327,6 @@ const EmployeeAttendance = () => {
       return d.status === 'absent' && (!isWeekendDay || isWorkingSaturday) && d.date <= new Date();
     }).length;
     
-    const compOffDays = data.filter(d => d.notes === 'Comp Off').length;
     const lateDays = data.filter(d => d.notes === 'Late arrival').length;
     
     // Calculate total hours from all completed days
@@ -375,7 +352,6 @@ const EmployeeAttendance = () => {
       workingDays,
       presentDays,
       absentDays,
-      compOffDays,
       lateDays,
       totalHours: `${hours}h ${minutes}m`,
       attendanceRate: workingDays > 0 ? Math.round((presentDays / workingDays) * 100) : 0
@@ -383,7 +359,6 @@ const EmployeeAttendance = () => {
   };
 
   const getStatusColor = (status, notes) => {
-    if (notes === 'Comp Off') return '#8b5cf6'; // Purple for comp off
     switch (status) {
       case 'completed': return '#10b981';
       case 'active': return '#3b82f6';
@@ -394,7 +369,6 @@ const EmployeeAttendance = () => {
   };
 
   const getStatusIcon = (status, notes) => {
-    if (notes === 'Comp Off') return <Award size={16} />; // Award icon for comp off
     switch (status) {
       case 'completed': return <CheckCircle size={16} />;
       case 'active': return <Clock size={16} />;
@@ -447,10 +421,6 @@ const EmployeeAttendance = () => {
       case 'late':
         filtered = attendanceData.filter(d => d.notes === 'Late arrival');
         title = 'Late Days';
-        break;
-      case 'compoff':
-        filtered = attendanceData.filter(d => d.notes === 'Comp Off');
-        title = 'Comp Off Days';
         break;
       default:
         return;
@@ -771,49 +741,6 @@ const EmployeeAttendance = () => {
           <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>Total Hours</div>
         </div>
         
-        <div 
-          onClick={() => handleCardClick('compoff')}
-          style={{
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-            borderRadius: '1rem',
-            padding: '1.5rem',
-            color: 'white',
-            textAlign: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            position: 'relative',
-            overflow: 'hidden'
-          }}
-          onMouseEnter={(e) => {
-            e.target.style.transform = 'translateY(-5px) scale(1.02)';
-            e.target.style.boxShadow = '0 15px 30px rgba(139, 92, 246, 0.3)';
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.transform = 'translateY(0) scale(1)';
-            e.target.style.boxShadow = 'none';
-          }}
-        >
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-              <Award size={24} />
-              {monthlyStats.compOffDays || 0}
-            </div>
-            <div style={{ fontSize: '0.875rem', opacity: 0.8, marginBottom: '0.5rem' }}>Comp Off Days</div>
-            <div style={{ fontSize: '0.75rem', opacity: 0.7, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
-              <Eye size={12} />
-              Click to view details
-            </div>
-          </div>
-          <div style={{
-            position: 'absolute',
-            top: '-20px',
-            right: '-20px',
-            width: '80px',
-            height: '80px',
-            background: 'rgba(255, 255, 255, 0.1)',
-            borderRadius: '50%'
-          }}></div>
-        </div>
       </div>
 
       {/* Month Navigation */}
@@ -954,7 +881,7 @@ const EmployeeAttendance = () => {
                     }}>
                       {getStatusIcon(day.status, day.notes)}
                       <span style={{ fontSize: '0.875rem', fontWeight: '500', textTransform: 'capitalize' }}>
-                        {day.notes === 'Comp Off' ? 'Comp Off' : day.status}
+                        {day.status}
                       </span>
                     </div>
                   </div>
@@ -1274,12 +1201,12 @@ const EmployeeAttendance = () => {
                           }}>
                             {getStatusIcon(day.status, day.notes)}
                             <span style={{ fontSize: '0.875rem', fontWeight: '500', textTransform: 'capitalize' }}>
-                              {day.notes === 'Comp Off' ? 'Comp Off' : day.status}
+                              {day.status}
                             </span>
                           </div>
                         </div>
                         
-                        {(day.status !== 'weekend' || day.notes === 'Comp Off') && (
+                        {day.status !== 'weekend' && (
                           <div style={{
                             display: 'grid',
                             gridTemplateColumns: '1fr 1fr',

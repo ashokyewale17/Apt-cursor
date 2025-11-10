@@ -344,36 +344,11 @@ const EmployeeDashboard = () => {
         // Handle days with attendance records
         if (record) {
           const dbStatus = record.status || 'Present';
-          const isCompOffDay = record.compOff === true || dbStatus === 'CompOff';
           let worked = '0h 0m';
           let status = 'absent';
           
           if (dbStatus === 'Leave' || dbStatus === 'Holiday' || dbStatus === 'Absent') {
             status = 'absent';
-          } else if (isCompOffDay && record.inTime) {
-            // Comp off day with check-in
-            if (record.outTime) {
-              const checkIn = new Date(record.inTime);
-              const checkOut = new Date(record.outTime);
-              const diffMs = checkOut - checkIn;
-              const hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
-              const hours = Math.floor(hoursWorked);
-              const minutes = Math.round((hoursWorked - hours) * 60);
-              worked = `${hours}h ${minutes}m`;
-              status = 'completed';
-            } else if (isToday) {
-              status = 'active';
-              const checkIn = new Date(record.inTime);
-              const now = new Date();
-              const diffMs = now - checkIn;
-              const hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
-              const hours = Math.floor(hoursWorked);
-              const minutes = Math.round((hoursWorked - hours) * 60);
-              worked = `${hours}h ${minutes}m`;
-            } else {
-              status = 'completed';
-              worked = '0h 0m';
-            }
           } else if (record.inTime) {
             if (record.outTime) {
               // Has check-out time - completed day

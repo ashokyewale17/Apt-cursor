@@ -710,14 +710,6 @@ const AdminDashboard = () => {
       ]
     };
 
-    // Calculate comp off days - employees who worked on weekends/holidays
-    const compOffEmployees = realEmployees.filter(emp => {
-      // In a real implementation, this would check actual attendance records
-      // For demo purposes, we'll simulate with a random selection
-      const weekendWorkers = [1, 3, 5]; // Employee IDs who worked weekends
-      return weekendWorkers.includes(emp.id);
-    });
-
     setAnalyticsData({
       weeklyTrends: last7Days,
       departmentStats,
@@ -725,7 +717,6 @@ const AdminDashboard = () => {
       overallMetrics: {
         avgAttendance: 91.2,
         avgProductivity: 89.1,
-        totalCompOffDays: compOffEmployees.length,
         employeeSatisfaction: 4.2
       }
     });
@@ -1824,49 +1815,6 @@ const AdminDashboard = () => {
           </div>
         </div>
         
-        <div className="stat-card" style={{ borderLeft: '4px solid var(--info-color, #3b82f6)', cursor: 'pointer', transition: 'all 0.2s ease' }}
-             onClick={() => {
-               // Show comp off employees instead of analytics modal (excluding admins)
-               const compOffEmployees = realEmployees.filter(emp => emp.role !== 'admin').filter(emp => {
-                 const weekendWorkers = [1, 3, 5]; // Employee IDs who worked weekends
-                 return weekendWorkers.includes(emp.id);
-               });
-               setSelectedStatusType('compOff');
-               setStatusEmployees(compOffEmployees);
-               setShowStatusModal(true);
-             }}
-             onMouseEnter={(e) => {
-               e.currentTarget.style.transform = 'translateY(-2px)';
-               e.currentTarget.style.boxShadow = '0 8px 25px rgba(59, 130, 246, 0.15)';
-             }}
-             onMouseLeave={(e) => {
-               e.currentTarget.style.transform = 'translateY(0)';
-               e.currentTarget.style.boxShadow = '';
-             }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <div className="stat-value" style={{ color: 'var(--info-color, #3b82f6)' }}>
-                {/* Calculate comp off days based on employees who worked on weekends/holidays (excluding admins) */}
-                {realEmployees.filter(emp => emp.role !== 'admin').filter(emp => {
-                  // In a real implementation, this would check actual attendance records
-                  // For demo purposes, we'll simulate with a random selection
-                  const weekendWorkers = [1, 3, 5]; // Employee IDs who worked weekends
-                  return weekendWorkers.includes(emp.id);
-                }).length}
-              </div>
-              <div className="stat-label">
-                <Clock size={16} style={{ display: 'inline', marginRight: '0.25rem' }} />
-                Comp Off Days
-              </div>
-            </div>
-            <div style={{ padding: '0.5rem', background: 'var(--info-color, #3b82f6)', borderRadius: '0.5rem' }}>
-              <Clock size={20} style={{ color: 'white' }} />
-            </div>
-          </div>
-          <div style={{ fontSize: '0.875rem', color: 'var(--info-color, #3b82f6)', marginTop: '0.5rem' }}>
-            <ArrowUpRight size={14} style={{ display: 'inline' }} /> Employees with comp off days
-          </div>
-        </div>
       </div>
 
       {/* Filters and Search */}
@@ -2334,51 +2282,6 @@ const AdminDashboard = () => {
           </div>
           <div className="card-body" style={{ padding: 0 }}>
             <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-              {/* Show comp off days information in activity feed (excluding admins) */}
-              {realEmployees.filter(emp => emp.role !== 'admin').filter(emp => {
-                // In a real implementation, this would check actual attendance records
-                // For demo purposes, we'll simulate with a random selection
-                const weekendWorkers = [1, 3, 5]; // Employee IDs who worked weekends
-                return weekendWorkers.includes(emp.id);
-              }).length > 0 && (
-                <div className="alert" style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #3b82f6',
-                  background: '#eff6ff',
-                  color: '#1e40af',
-                  padding: '1rem'
-                }}>
-                  <div>
-                    <strong>{realEmployees.filter(emp => emp.role !== 'admin').filter(emp => {
-                      // In a real implementation, this would check actual attendance records
-                      // For demo purposes, we'll simulate with a random selection
-                      const weekendWorkers = [1, 3, 5]; // Employee IDs who worked weekends
-                      return weekendWorkers.includes(emp.id);
-                    }).length} employees</strong> eligible for comp off days
-                    <div style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                      Review weekend/holiday work records
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      const compOffEmployees = realEmployees.filter(emp => emp.role !== 'admin').filter(emp => {
-                        const weekendWorkers = [1, 3, 5]; // Employee IDs who worked weekends
-                        return weekendWorkers.includes(emp.id);
-                      });
-                      setSelectedStatusType('compOff');
-                      setStatusEmployees(compOffEmployees);
-                      setShowStatusModal(true);
-                    }}
-                    className="btn btn-sm" 
-                    style={{ background: '#3b82f6', color: 'white' }}
-                  >
-                    Review
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -2447,15 +2350,6 @@ const AdminDashboard = () => {
                     </div>
                     <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Average Productivity</div>
                     <div style={{ fontSize: '0.875rem', color: 'var(--success-color)' }}>↗ +1.8% from last month</div>
-                  </div>
-                </div>
-                <div className="card">
-                  <div className="card-body" style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--info-color)', marginBottom: '0.5rem' }}>
-                      {analyticsData.overallMetrics?.totalCompOffDays}
-                    </div>
-                    <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Comp Off Days</div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--info-color)' }}>Employees eligible for comp off</div>
                   </div>
                 </div>
                 <div className="card">
@@ -3089,7 +2983,6 @@ const AdminDashboard = () => {
               background: `linear-gradient(135deg, ${
                 selectedStatusType === 'active' ? 'var(--success-color), #059669' :
                 selectedStatusType === 'absent' ? 'var(--danger-color), #dc2626' :
-                selectedStatusType === 'compOff' ? 'var(--info-color), #3b82f6' :
                 'var(--warning-color), #d97706'
               })`,
               color: 'white'
@@ -3100,14 +2993,12 @@ const AdminDashboard = () => {
                     {
                       selectedStatusType === 'active' ? '✅ Active Employees Today' :
                       selectedStatusType === 'absent' ? '📋 Employees on Leave / Absent Today' :
-                      selectedStatusType === 'compOff' ? '🕒 Employees with Comp Off Days' :
                       '⏰ Late Employees Today'
                     }
                   </h2>
                   <p style={{ margin: 0, opacity: 0.9, fontSize: '1.1rem' }}>
                     {statusEmployees.length} employee{statusEmployees.length !== 1 ? 's' : ''} {
                       selectedStatusType === 'absent' ? 'on leave or absent today' :
-                      selectedStatusType === 'compOff' ? 'eligible for comp off days' : 
                       `currently ${selectedStatusType}`
                     }
                   </p>
@@ -3159,26 +3050,11 @@ const AdminDashboard = () => {
                   <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                     Total {
                       selectedStatusType === 'absent' ? 'On Leave / Absent' :
-                      selectedStatusType === 'compOff' ? 'Eligible Employees' :
                       selectedStatusType.charAt(0).toUpperCase() + selectedStatusType.slice(1)
                     }
                   </div>
                 </div>
-                {selectedStatusType === 'compOff' ? (
-                  <div style={{ textAlign: 'center', padding: '1rem' }}>
-                    <div style={{
-                      fontSize: '1.5rem',
-                      fontWeight: '700',
-                      color: 'var(--info-color)',
-                      marginBottom: '0.25rem'
-                    }}>
-                      {statusEmployees.length * 1.5} {/* Simulated comp off days */}
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                      Total Comp Off Days
-                    </div>
-                  </div>
-                ) : selectedStatusType === 'absent' ? (
+                {selectedStatusType === 'absent' ? (
                   <>
                     <div style={{ textAlign: 'center', padding: '1rem' }}>
                       <div style={{
@@ -3279,19 +3155,16 @@ const AdminDashboard = () => {
                 }}>
                   <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>
                     {selectedStatusType === 'active' ? '🎉' : 
-                     selectedStatusType === 'absent' ? '📋' : 
-                     selectedStatusType === 'compOff' ? '🕒' : '⏰'}
+                     selectedStatusType === 'absent' ? '📋' : '⏰'}
                   </div>
                   <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.5rem' }}>
                     {selectedStatusType === 'active' ? 'No active employees' :
                      selectedStatusType === 'absent' ? 'No employees on leave or absent today' :
-                     selectedStatusType === 'compOff' ? 'No employees eligible for comp off days' :
                      'No late employees today!'}
                   </h3>
                   <p style={{ margin: 0 }}>
                     {selectedStatusType === 'absent' ? 'All employees are present today! 🎊' :
                      selectedStatusType === 'late' ? 'Everyone arrived on time today! ⭐' :
-                     selectedStatusType === 'compOff' ? 'No employees worked on weekends/holidays recently' :
                      'Check back during work hours.'}
                   </p>
                 </div>
@@ -3317,7 +3190,6 @@ const AdminDashboard = () => {
                       e.currentTarget.style.boxShadow = '0 10px 25px rgba(0,0,0,0.1)';
                       e.currentTarget.style.borderColor = selectedStatusType === 'active' ? 'var(--success-color)' :
                                                          selectedStatusType === 'absent' ? 'var(--danger-color)' :
-                                                         selectedStatusType === 'compOff' ? 'var(--info-color)' :
                                                          'var(--warning-color)';
                     }}
                     onMouseLeave={(e) => {
@@ -3338,14 +3210,12 @@ const AdminDashboard = () => {
                         background: selectedStatusType === 'active' ? 'var(--success-color)' :
                                    selectedStatusType === 'absent' ? 
                                      (employee.status === 'absent' ? 'var(--danger-color)' : 'var(--info-color)') :
-                                   selectedStatusType === 'compOff' ? 'var(--info-color)' :
                                    'var(--warning-color)',
                         color: 'white',
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px'
                       }}>
-                        {selectedStatusType === 'compOff' ? 'Comp Off Eligible' : 
-                         selectedStatusType === 'absent' ? 
+                        {selectedStatusType === 'absent' ? 
                            (employee.status === 'absent' ? 'Absent Today' : 'On Leave') :
                          selectedStatusType}
                       </div>
@@ -3360,7 +3230,6 @@ const AdminDashboard = () => {
                             selectedStatusType === 'active' ? 'var(--success-color), #059669' :
                             selectedStatusType === 'absent' ? 
                               (employee.status === 'absent' ? 'var(--danger-color), #dc2626' : 'var(--info-color), #3b82f6') :
-                            selectedStatusType === 'compOff' ? 'var(--info-color), #3b82f6' :
                             'var(--warning-color), #d97706'
                           })`,
                           display: 'flex',
@@ -3397,28 +3266,7 @@ const AdminDashboard = () => {
                         borderRadius: '0.5rem',
                         marginBottom: '1rem'
                       }}>
-                        {selectedStatusType === 'compOff' ? (
-                          <>
-                            <div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Weekend Work Days</div>
-                              <div style={{ fontWeight: '600', color: 'var(--info-color)' }}>
-                                Saturday, Sunday
-                              </div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Comp Off Status</div>
-                              <div style={{ fontWeight: '600' }}>Eligible</div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Hours Worked</div>
-                              <div style={{ fontWeight: '600' }}>8.5h avg</div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Next Comp Off</div>
-                              <div style={{ fontWeight: '600' }}>Pending approval</div>
-                            </div>
-                          </>
-                        ) : selectedStatusType === 'absent' ? (
+                        {selectedStatusType === 'absent' ? (
                           <>
                             <div>
                               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
