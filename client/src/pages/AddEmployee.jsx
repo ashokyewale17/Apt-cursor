@@ -8,7 +8,7 @@ const AddEmployee = () => {
     name: "",
     email: "",
     employeeId: "",
-    department: "Engineering",
+    department: "Software",
     position: "",
     phone: "",
     role: "Employee",
@@ -77,7 +77,7 @@ const AddEmployee = () => {
           name: "",
           email: "",
           employeeId: "",
-          department: "Engineering",
+          department: "Software",
           position: "",
           phone: "",
           role: "Employee",
@@ -374,13 +374,10 @@ const AddEmployee = () => {
                       color: '#1f2937'
                     }}
                   >
-                    <option value="Engineering">Engineering</option>
-                    <option value="Marketing">Marketing</option>
-                    <option value="Sales">Sales</option>
-                    <option value="HR">Human Resources</option>
-                    <option value="Finance">Finance</option>
-                    <option value="Design">Design</option>
+                    <option value="Electronics">Electronics</option>
                     <option value="Operations">Operations</option>
+                    <option value="Software">Software</option>
+                    <option value="Mechanical">Mechanical</option>
                   </select>
                 </div>
 

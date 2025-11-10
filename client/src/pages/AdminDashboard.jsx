@@ -291,20 +291,24 @@ const AdminDashboard = () => {
               
               if (dbStatus === 'Leave' || dbStatus === 'Holiday' || dbStatus === 'Absent') {
                 status = 'absent';
+              } else if (dbStatus === 'HalfDay') {
+                status = 'half';
+              } else if (dbStatus === 'EarlyLeave') {
+                status = 'early';
               } else if (record.inTime) {
-                // Determine if late (check-in after 9:30 AM)
+                // Determine if late (check-in after 8:30 AM) - but only if lateMark is true
                 const inTimeDate = new Date(record.inTime);
                 const lateThreshold = new Date(inTimeDate);
-                lateThreshold.setHours(9, 30, 0, 0);
-                const isLate = inTimeDate > lateThreshold;
+                lateThreshold.setHours(8, 30, 0, 0);
+                const isLate = record.lateMark || (inTimeDate > lateThreshold);
                 
                 if (record.outTime) {
                   // Completed day
-                  status = isLate ? 'late' : 'present';
+                  status = (isLate && record.lateMark) ? 'late' : 'present';
                 } else {
                   // Active day (checked in but not out)
                   if (isToday) {
-                    status = isLate ? 'late' : 'present';
+                    status = (isLate && record.lateMark) ? 'late' : 'present';
                   } else {
                     status = 'present'; // Past day without check-out
                   }
@@ -1329,23 +1333,60 @@ const AdminDashboard = () => {
     await loadDashboardData();
   };
 
-  const handleEmployeeDelete = (employeeId) => {
-    const updatedEmployees = realEmployees.filter(emp => emp.id !== employeeId);
-    setRealEmployees(updatedEmployees);
-    setEmployeeStatus(updatedEmployees);
-    
-    // Save to localStorage for login authentication
-    try {
-      localStorage.setItem('realEmployees', JSON.stringify(updatedEmployees));
-    } catch (error) {
-      console.log('Failed to save employee data to localStorage:', error);
+  const handleEmployeeDelete = async (employeeId) => {
+    // Confirm deletion
+    if (!window.confirm('Are you sure you want to delete this employee? This action cannot be undone.')) {
+      return;
     }
-    
-    // Update stats
-    setStats(prev => ({
-      ...prev,
-      totalEmployees: updatedEmployees.length
-    }));
+
+    try {
+      const token = localStorage.getItem('token');
+      const employee = realEmployees.find(emp => (emp._id || emp.id) === employeeId);
+      
+      if (!employee) {
+        alert('Employee not found');
+        return;
+      }
+
+      // Call API to delete employee
+      const response = await fetch(`/api/employees/${employeeId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete employee');
+      }
+
+      // Update local state
+      const updatedEmployees = realEmployees.filter(emp => (emp._id || emp.id) !== employeeId);
+      setRealEmployees(updatedEmployees);
+      setEmployeeStatus(updatedEmployees);
+      
+      // Save to localStorage for login authentication
+      try {
+        localStorage.setItem('realEmployees', JSON.stringify(updatedEmployees));
+      } catch (error) {
+        console.log('Failed to save employee data to localStorage:', error);
+      }
+      
+      // Update stats
+      setStats(prev => ({
+        ...prev,
+        totalEmployees: updatedEmployees.filter(emp => emp.role !== 'admin').length
+      }));
+
+      alert('Employee deleted successfully!');
+      
+      // Reload employee data from database to ensure sync
+      await loadDashboardData();
+    } catch (error) {
+      console.error('Error deleting employee:', error);
+      alert(error.message || 'Failed to delete employee. Please try again.');
+    }
   };
 
   const handleEmployeeStatusToggle = async (employee) => {
@@ -1852,12 +1893,10 @@ const AdminDashboard = () => {
               style={{ padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--border-color)', fontSize: '0.875rem' }}
             >
               <option value="all">All Departments</option>
-              <option value="Engineering">Engineering</option>
-              <option value="Marketing">Marketing</option>
-              <option value="Design">Design</option>
-              <option value="Sales">Sales</option>
-              <option value="Finance">Finance</option>
-              <option value="HR">HR</option>
+              <option value="Electronics">Electronics</option>
+              <option value="Operations">Operations</option>
+              <option value="Software">Software</option>
+              <option value="Mechanical">Mechanical</option>
             </select>
             <select 
               value={timeFilter}
@@ -3438,12 +3477,10 @@ const AdminDashboard = () => {
                 }}
               >
                 <option value="all">All Departments</option>
-                <option value="Admin">Admin</option>
-                <option value="Software">Software</option>
-                <option value="Testing">Testing</option>
+                <option value="Electronics">Electronics</option>
                 <option value="Operations">Operations</option>
-                <option value="Design">Design</option>
-                <option value="Embedded">Embedded</option>
+                <option value="Software">Software</option>
+                <option value="Mechanical">Mechanical</option>
               </select>
             </div>
             
@@ -3889,8 +3926,25 @@ const EmployeeForm = ({ employee = {}, onSave, onCancel }) => {
 
 // Employee Row Component
 const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEditing }) => {
-  const [editData, setEditData] = useState(employee);
+  const [editData, setEditData] = useState({
+    ...employee,
+    employeeId: employee.employeeId || '',
+    birthDate: employee.birthDate || null,
+    companyEmail: employee.companyEmail || '',
+    dateOfJoining: employee.dateOfJoining || null
+  });
   const [isToggling, setIsToggling] = useState(false);
+
+  // Sync editData when employee prop changes
+  useEffect(() => {
+    setEditData({
+      ...employee,
+      employeeId: employee.employeeId || '',
+      birthDate: employee.birthDate || null,
+      companyEmail: employee.companyEmail || '',
+      dateOfJoining: employee.dateOfJoining || null
+    });
+  }, [employee]);
 
   const formatDate = (date) => {
     if (!date) return 'N/A';
@@ -3933,9 +3987,9 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
           position: editData.position,
           department: editData.department,
           employeeId: editData.employeeId,
-          birthDate: editData.birthDate ? format(editData.birthDate, 'yyyy-MM-dd') : undefined,
-          companyEmail: editData.companyEmail,
-          dateOfJoining: editData.dateOfJoining ? format(editData.dateOfJoining, 'yyyy-MM-dd') : undefined
+          birthDate: editData.birthDate ? (typeof editData.birthDate === 'string' ? editData.birthDate : (editData.birthDate instanceof Date ? format(editData.birthDate, 'yyyy-MM-dd') : editData.birthDate)) : undefined,
+          companyEmail: editData.companyEmail || undefined,
+          dateOfJoining: editData.dateOfJoining ? (typeof editData.dateOfJoining === 'string' ? editData.dateOfJoining : (editData.dateOfJoining instanceof Date ? format(editData.dateOfJoining, 'yyyy-MM-dd') : editData.dateOfJoining)) : undefined
         })
       });
 
@@ -3970,7 +4024,13 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
               </h3>
               <button 
                 onClick={() => {
-                  setEditData(employee);
+                  setEditData({
+                    ...employee,
+                    employeeId: employee.employeeId || '',
+                    birthDate: employee.birthDate || null,
+                    companyEmail: employee.companyEmail || '',
+                    dateOfJoining: employee.dateOfJoining || null
+                  });
                   onEdit(null);
                 }} 
                 className="btn btn-sm btn-outline"
@@ -4064,8 +4124,8 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
                 </label>
                 <input
                   type="date"
-                  value={editData.birthDate ? format(new Date(editData.birthDate), 'yyyy-MM-dd') : ''}
-                  onChange={(e) => setEditData({ ...editData, birthDate: e.target.value ? new Date(e.target.value) : null })}
+                  value={editData.birthDate ? (editData.birthDate instanceof Date ? format(editData.birthDate, 'yyyy-MM-dd') : format(new Date(editData.birthDate), 'yyyy-MM-dd')) : ''}
+                  onChange={(e) => setEditData({ ...editData, birthDate: e.target.value ? e.target.value : null })}
                   className="form-control"
                   style={{ padding: '0.75rem', fontSize: '0.875rem' }}
                 />
@@ -4078,8 +4138,8 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
                 </label>
                 <input
                   type="date"
-                  value={editData.dateOfJoining ? format(new Date(editData.dateOfJoining), 'yyyy-MM-dd') : ''}
-                  onChange={(e) => setEditData({ ...editData, dateOfJoining: e.target.value ? new Date(e.target.value) : null })}
+                  value={editData.dateOfJoining ? (editData.dateOfJoining instanceof Date ? format(editData.dateOfJoining, 'yyyy-MM-dd') : format(new Date(editData.dateOfJoining), 'yyyy-MM-dd')) : ''}
+                  onChange={(e) => setEditData({ ...editData, dateOfJoining: e.target.value ? e.target.value : null })}
                   className="form-control"
                   required
                   style={{ padding: '0.75rem', fontSize: '0.875rem' }}
@@ -4099,12 +4159,10 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
                   style={{ padding: '0.75rem', fontSize: '0.875rem' }}
                 >
                   <option value="">Select Department</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Software">Software</option>
-                  <option value="Testing">Testing</option>
+                  <option value="Electronics">Electronics</option>
                   <option value="Operations">Operations</option>
-                  <option value="Design">Design</option>
-                  <option value="Embedded">Embedded</option>
+                  <option value="Software">Software</option>
+                  <option value="Mechanical">Mechanical</option>
                 </select>
               </div>
 
@@ -4308,6 +4366,25 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
           >
             <Edit size={12} style={{ marginRight: '0.25rem' }} />
             Edit
+          </button>
+          <button 
+            onClick={() => {
+              const employeeId = employee._id || employee.id;
+              if (employeeId && onDelete) {
+                onDelete(employeeId);
+              }
+            }}
+            className="btn btn-sm"
+            style={{ 
+              padding: '0.375rem 0.75rem', 
+              fontSize: '0.75rem',
+              background: '#ef4444',
+              color: 'white',
+              border: 'none'
+            }}
+          >
+            <Trash2 size={12} style={{ marginRight: '0.25rem' }} />
+            Delete
           </button>
         </div>
       </td>

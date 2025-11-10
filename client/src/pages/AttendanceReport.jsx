@@ -131,15 +131,53 @@ const AttendanceReport = () => {
                 leaveDays++;
               } else if (dbStatus === 'Absent') {
                 status = 'absent';
+              } else if (dbStatus === 'HalfDay') {
+                status = 'half';
+                halfDays++;
+                presentDays++;
+                if (record.inTime) {
+                  const inTimeDate = new Date(record.inTime);
+                  inTime = format(inTimeDate, 'HH:mm');
+                }
+                if (record.outTime) {
+                  const outTimeDate = new Date(record.outTime);
+                  outTime = format(outTimeDate, 'HH:mm');
+                  if (record.inTime) {
+                    const inTimeDate = new Date(record.inTime);
+                    const diffMs = outTimeDate - inTimeDate;
+                    hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
+                    hoursWorked = Math.round(hoursWorked * 100) / 100;
+                    totalHours += hoursWorked;
+                  }
+                }
+              } else if (dbStatus === 'EarlyLeave') {
+                status = 'early';
+                earlyLeaveDays++;
+                presentDays++;
+                if (record.inTime) {
+                  const inTimeDate = new Date(record.inTime);
+                  inTime = format(inTimeDate, 'HH:mm');
+                }
+                if (record.outTime) {
+                  const outTimeDate = new Date(record.outTime);
+                  outTime = format(outTimeDate, 'HH:mm');
+                  if (record.inTime) {
+                    const inTimeDate = new Date(record.inTime);
+                    const diffMs = outTimeDate - inTimeDate;
+                    hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
+                    hoursWorked = Math.round(hoursWorked * 100) / 100;
+                    totalHours += hoursWorked;
+                  }
+                }
               } else if (record.inTime) {
                 // Has check-in time
                 const inTimeDate = new Date(record.inTime);
                 inTime = format(inTimeDate, 'HH:mm');
                 
-                // Determine if late (check-in after 9:30 AM)
+                // Determine if late (check-in after 8:30 AM) - but only if lateMark is true
                 const lateThreshold = new Date(inTimeDate);
-                lateThreshold.setHours(9, 30, 0, 0);
-                const isLate = inTimeDate > lateThreshold;
+                lateThreshold.setHours(8, 30, 0, 0);
+                const isLate = record.lateMark || (inTimeDate > lateThreshold);
                 
                 if (record.outTime) {
                   // Has check-out time
@@ -153,23 +191,7 @@ const AttendanceReport = () => {
                   // Round to 2 decimal places for consistency (then we'll round to 1 decimal for display)
                   hoursWorked = Math.round(hoursWorked * 100) / 100;
                   
-                  // Determine if early leave (check-out before 5:00 PM and worked less than 6 hours)
-                  const earlyThreshold = new Date(outTimeDate);
-                  earlyThreshold.setHours(17, 0, 0, 0);
-                  const isEarlyLeave = outTimeDate < earlyThreshold && hoursWorked < 6;
-                  
-                  // Determine if half day (worked less than 4.5 hours)
-                  const isHalfDay = hoursWorked < 4.5 && hoursWorked >= 2;
-                  
-                  if (isHalfDay) {
-                    status = 'half';
-                    halfDays++;
-                    presentDays++;
-                  } else if (isEarlyLeave) {
-                    status = 'early';
-                    earlyLeaveDays++;
-                    presentDays++;
-                  } else if (isLate) {
+                  if (isLate && record.lateMark) {
                     status = 'late';
                     presentDays++;
                   } else {
@@ -181,7 +203,7 @@ const AttendanceReport = () => {
                   totalHours += hoursWorked;
                 } else {
                   // Checked in but not checked out yet
-                  status = isLate ? 'late' : 'present';
+                  status = (isLate && record.lateMark) ? 'late' : 'present';
                   presentDays++;
                   // Don't count hours if not checked out
                 }
