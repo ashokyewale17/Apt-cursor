@@ -80,11 +80,25 @@ router.post("/", authenticateToken, async (req, res) => {
       });
     }
     
-    // Validate dates
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // Validate dates - parse dates properly to avoid timezone issues
+    // Parse date strings in format "YYYY-MM-DD" as local dates
+    const parseDate = (dateString) => {
+      const parts = dateString.split('-');
+      if (parts.length !== 3) {
+        return new Date(dateString);
+      }
+      // Create date in local timezone (month is 0-indexed)
+      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    };
+    
+    const start = parseDate(startDate);
+    const end = parseDate(endDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    
+    // Normalize dates to midnight local time
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
     
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       return res.status(400).json({ message: "Invalid date format" });
