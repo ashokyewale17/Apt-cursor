@@ -58,6 +58,22 @@ const EmployeeDashboard = () => {
     loadWorkingSaturdays();
   }, []);
 
+  // Refresh stats when check-in status changes
+  useEffect(() => {
+    loadStats();
+  }, [isCheckedIn, checkInTime]);
+
+  // Refresh stats periodically when checked in (every minute)
+  useEffect(() => {
+    if (isCheckedIn) {
+      const interval = setInterval(() => {
+        loadStats();
+      }, 60000); // Refresh every minute
+      
+      return () => clearInterval(interval);
+    }
+  }, [isCheckedIn]);
+
   const loadWorkingSaturdays = async () => {
     try {
       const today = new Date();
@@ -123,28 +139,36 @@ const EmployeeDashboard = () => {
       
       if (response.ok) {
         const now = new Date();
+        // Use check-in time from database response if available, otherwise use current time
+        const checkInTimeFromDB = data.record && data.record.inTime 
+          ? new Date(data.record.inTime) 
+          : now;
+        
         setIsCheckedIn(true);
-        setCheckInTime(now);
+        setCheckInTime(checkInTimeFromDB);
         
         // Add to today's activity
         const newActivity = {
           id: Date.now(),
           type: 'check-in',
-          time: now,
+          time: checkInTimeFromDB,
           status: 'active'
         };
         setTodayActivity(prev => [...prev, newActivity]);
         
         // Save to localStorage for persistence - using user ID for employee-specific data
-        const storageKey = `checkIn_${user.id}_${format(now, 'yyyy-MM-dd')}`;
+        const storageKey = `checkIn_${user.id}_${format(checkInTimeFromDB, 'yyyy-MM-dd')}`;
         localStorage.setItem(storageKey, JSON.stringify({
           checkedIn: true,
-          checkInTime: now.toISOString(),
+          checkInTime: checkInTimeFromDB.toISOString(),
           activities: [...todayActivity, newActivity],
           userId: user.id,
           userName: user.name,
           location: location === 'site' ? siteName : location
         }));
+        
+        // Refresh stats to update today's hours
+        loadStats();
         
         console.log('Check-in successful:', data);
       } else {
@@ -217,6 +241,9 @@ const EmployeeDashboard = () => {
             userName: user.name
           }));
           
+          // Refresh stats to update today's hours and monthly average
+          loadStats();
+          
           console.log('Check-out successful:', data);
         }
         
@@ -241,10 +268,54 @@ const EmployeeDashboard = () => {
       const response = await fetch(`/api/attendance-records/today/${user.id}`);
       const data = await response.json();
       
-      if (response.ok && data.isCheckedIn) {
-        setIsCheckedIn(true);
-        if (data.record.inTime) {
-          setCheckInTime(new Date(data.record.inTime));
+      if (response.ok && data.record) {
+        const record = data.record;
+        setIsCheckedIn(data.isCheckedIn);
+        
+        if (record.inTime) {
+          const checkInTimeDate = new Date(record.inTime);
+          setCheckInTime(checkInTimeDate);
+          
+          // Add check-in activity to today's activity
+          const checkInActivity = {
+            id: Date.now(),
+            type: 'check-in',
+            time: checkInTimeDate,
+            status: 'active'
+          };
+          
+          // If there's a checkout, add that activity too
+          let activities = [checkInActivity];
+          if (record.outTime) {
+            const checkOutTimeDate = new Date(record.outTime);
+            const totalMinutes = Math.floor((checkOutTimeDate.getTime() - checkInTimeDate.getTime()) / (1000 * 60));
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            
+            const checkOutActivity = {
+              id: Date.now() + 1,
+              type: 'check-out',
+              time: checkOutTimeDate,
+              totalTime: `${hours}h ${minutes}m`,
+              status: 'completed'
+            };
+            activities.push(checkOutActivity);
+          }
+          
+          setTodayActivity(activities);
+          
+          // Also save to localStorage for consistency
+          const today = format(new Date(), 'yyyy-MM-dd');
+          const storageKey = `checkIn_${user.id}_${today}`;
+          localStorage.setItem(storageKey, JSON.stringify({
+            checkedIn: data.isCheckedIn,
+            checkInTime: record.inTime,
+            checkOutTime: record.outTime || null,
+            activities: activities,
+            userId: user.id,
+            userName: user.name,
+            location: record.location || 'Office'
+          }));
         }
       } else {
         // Fallback to localStorage if API fails
@@ -456,89 +527,202 @@ const EmployeeDashboard = () => {
     }
   };
 
-  const loadStats = () => {
+  const loadStats = async () => {
     // Calculate today's hours
     const today = format(new Date(), 'yyyy-MM-dd');
-    const todayData = localStorage.getItem(`checkIn_${today}`);
+    const storageKey = `checkIn_${user.id}_${today}`;
+    const todayData = localStorage.getItem(storageKey);
     let todayHours = '0h 0m';
     
     if (todayData) {
       const data = JSON.parse(todayData);
-      todayHours = data.totalTime || '0h 0m';
+      if (data.totalTime) {
+        todayHours = data.totalTime;
+      } else if (data.checkInTime && isCheckedIn) {
+        // Calculate hours from check-in time to now if currently checked in
+        const checkInTime = new Date(data.checkInTime);
+        const now = new Date();
+        const diffMs = now.getTime() - checkInTime.getTime();
+        const totalMinutes = Math.floor(diffMs / (1000 * 60));
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        todayHours = `${hours}h ${minutes}m`;
+      }
+    } else if (isCheckedIn && checkInTime) {
+      // Calculate from state if checked in but no localStorage
+      const now = new Date();
+      const diffMs = now.getTime() - checkInTime.getTime();
+      const totalMinutes = Math.floor(diffMs / (1000 * 60));
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      todayHours = `${hours}h ${minutes}m`;
     }
 
     // Calculate actual monthly hours based on 9-hour workdays
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    
-    // Get the first and last day of the current month
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    
-    // Count working days (Monday to Friday) in the month
-    let workingDays = 0;
-    let totalMinutesWorked = 0;
-    
-    for (let day = new Date(firstDay); day <= lastDay; day.setDate(day.getDate() + 1)) {
-      // Check if it's a weekday (Monday=1 to Friday=5)
-      const dayOfWeek = day.getDay();
-      if (dayOfWeek > 0 && dayOfWeek < 6) {
-        workingDays++;
-        
-        // Check if there's data for this day
-        const dayKey = format(day, 'yyyy-MM-dd');
-        const storageKey = `checkIn_${user.id}_${dayKey}`;
-        const dayData = localStorage.getItem(storageKey);
-        
-        if (dayData) {
-          const data = JSON.parse(dayData);
-          if (data.totalTime) {
-            // Parse the time string (e.g., "8h 30m")
-            const timeParts = data.totalTime.split(' ');
-            let hours = 0;
-            let minutes = 0;
+    // First, try to get data from API
+    try {
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+      const employeeId = user.id || user._id;
+      
+      const response = await fetch(`/api/attendance-records/employee/${employeeId}/${month}/${year}`);
+      const records = response.ok ? await response.json() : [];
+      
+      // Get the first and last day of the current month
+      const firstDay = new Date(year, now.getMonth(), 1);
+      const lastDay = new Date(year, now.getMonth() + 1, 0);
+      
+      // Count working days (Monday to Friday) in the month
+      let workingDays = 0;
+      let totalMinutesWorked = 0;
+      
+      // Create a map of date -> record for quick lookup
+      const recordsMap = new Map();
+      records.forEach(record => {
+        const recordDate = new Date(record.date);
+        const dateKey = format(recordDate, 'yyyy-MM-dd');
+        recordsMap.set(dateKey, record);
+      });
+      
+      for (let day = new Date(firstDay); day <= lastDay; day.setDate(day.getDate() + 1)) {
+        // Check if it's a weekday (Monday=1 to Friday=5)
+        const dayOfWeek = day.getDay();
+        if (dayOfWeek > 0 && dayOfWeek < 6) {
+          workingDays++;
+          
+          const dayKey = format(day, 'yyyy-MM-dd');
+          const record = recordsMap.get(dayKey);
+          
+          if (record && record.inTime) {
+            let hoursWorked = 0;
             
-            for (let i = 0; i < timeParts.length; i++) {
-              if (timeParts[i].includes('h')) {
-                hours = parseInt(timeParts[i].replace('h', '')) || 0;
-              } else if (timeParts[i].includes('m')) {
-                minutes = parseInt(timeParts[i].replace('m', '')) || 0;
-              }
+            if (record.outTime) {
+              // Completed day - calculate from inTime to outTime
+              const checkIn = new Date(record.inTime);
+              const checkOut = new Date(record.outTime);
+              const diffMs = checkOut.getTime() - checkIn.getTime();
+              hoursWorked = diffMs / (1000 * 60 * 60);
+            } else if (dayKey === today && isCheckedIn) {
+              // Today and currently checked in - calculate from inTime to now
+              const checkIn = new Date(record.inTime);
+              const now = new Date();
+              const diffMs = now.getTime() - checkIn.getTime();
+              hoursWorked = diffMs / (1000 * 60 * 60);
             }
             
-            totalMinutesWorked += hours * 60 + minutes;
+            totalMinutesWorked += hoursWorked * 60;
           }
         }
       }
+      
+      // Calculate average daily hours worked (target: 9h/day)
+      const avgMonthlyHours = workingDays > 0 ? 
+        (totalMinutesWorked / 60) / workingDays : 0;
+      
+      // Format as "Xh Ym" or just "Xh" if no minutes
+      const hours = Math.floor(avgMonthlyHours);
+      const minutes = Math.round((avgMonthlyHours - hours) * 60);
+      const monthlyHours = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+
+      // Calculate week hours (mock data)
+      const weekHours = '32h 15m';
+      const avgDaily = '6h 27m';
+      const pendingLeaves = 2;
+      const tasksCompleted = 8;
+      const tasksPending = 3;
+
+      setStats({
+        todayHours,
+        weekHours,
+        avgDaily,
+        pendingLeaves,
+        monthlyHours,
+        tasksCompleted,
+        tasksPending
+      });
+    } catch (error) {
+      console.error('Error loading stats from API, using localStorage fallback:', error);
+      
+      // Fallback to localStorage calculation
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      
+      // Get the first and last day of the current month
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      
+      // Count working days (Monday to Friday) in the month
+      let workingDays = 0;
+      let totalMinutesWorked = 0;
+      
+      for (let day = new Date(firstDay); day <= lastDay; day.setDate(day.getDate() + 1)) {
+        // Check if it's a weekday (Monday=1 to Friday=5)
+        const dayOfWeek = day.getDay();
+        if (dayOfWeek > 0 && dayOfWeek < 6) {
+          workingDays++;
+          
+          // Check if there's data for this day
+          const dayKey = format(day, 'yyyy-MM-dd');
+          const storageKey = `checkIn_${user.id}_${dayKey}`;
+          const dayData = localStorage.getItem(storageKey);
+          
+          if (dayData) {
+            const data = JSON.parse(dayData);
+            if (data.totalTime) {
+              // Parse the time string (e.g., "8h 30m")
+              const timeParts = data.totalTime.split(' ');
+              let hours = 0;
+              let minutes = 0;
+              
+              for (let i = 0; i < timeParts.length; i++) {
+                if (timeParts[i].includes('h')) {
+                  hours = parseInt(timeParts[i].replace('h', '')) || 0;
+                } else if (timeParts[i].includes('m')) {
+                  minutes = parseInt(timeParts[i].replace('m', '')) || 0;
+                }
+              }
+              
+              totalMinutesWorked += hours * 60 + minutes;
+            } else if (dayKey === today && data.checkInTime && isCheckedIn) {
+              // Today and currently checked in - calculate from check-in to now
+              const checkInTime = new Date(data.checkInTime);
+              const now = new Date();
+              const diffMs = now.getTime() - checkInTime.getTime();
+              const totalMinutes = Math.floor(diffMs / (1000 * 60));
+              totalMinutesWorked += totalMinutes;
+            }
+          }
+        }
+      }
+      
+      // Calculate average daily hours worked (target: 9h/day)
+      const avgMonthlyHours = workingDays > 0 ? 
+        (totalMinutesWorked / 60) / workingDays : 0;
+      
+      // Format as "Xh Ym" or just "Xh" if no minutes
+      const hours = Math.floor(avgMonthlyHours);
+      const minutes = Math.round((avgMonthlyHours - hours) * 60);
+      const monthlyHours = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+
+      // Calculate week hours (mock data)
+      const weekHours = '32h 15m';
+      const avgDaily = '6h 27m';
+      const pendingLeaves = 2;
+      const tasksCompleted = 8;
+      const tasksPending = 3;
+
+      setStats({
+        todayHours,
+        weekHours,
+        avgDaily,
+        pendingLeaves,
+        monthlyHours,
+        tasksCompleted,
+        tasksPending
+      });
     }
-    
-    // Calculate average daily hours based on 9-hour standard
-    const totalMinutesExpected = workingDays * 9 * 60;
-    const avgMonthlyHours = totalMinutesExpected > 0 ? 
-      ((totalMinutesWorked / totalMinutesExpected) * (workingDays * 9)).toFixed(1) : 0;
-    
-    // Format as "Xh Ym" or just "Xh" if no minutes
-    const hours = Math.floor(avgMonthlyHours);
-    const minutes = Math.round((avgMonthlyHours - hours) * 60);
-    const monthlyHours = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-
-    // Calculate week hours (mock data)
-    const weekHours = '32h 15m';
-    const avgDaily = '6h 27m';
-    const pendingLeaves = 2;
-    const tasksCompleted = 8;
-    const tasksPending = 3;
-
-    setStats({
-      todayHours,
-      weekHours,
-      avgDaily,
-      pendingLeaves,
-      monthlyHours,
-      tasksCompleted,
-      tasksPending
-    });
   };
 
   const loadRecentActivity = () => {
