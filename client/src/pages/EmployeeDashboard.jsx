@@ -645,46 +645,46 @@ const EmployeeDashboard = () => {
       console.error('Error loading stats from API, using localStorage fallback:', error);
       
       // Fallback to localStorage calculation
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth();
-      
-      // Get the first and last day of the current month
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
-      
-      // Count working days (Monday to Friday) in the month
-      let workingDays = 0;
-      let totalMinutesWorked = 0;
-      
-      for (let day = new Date(firstDay); day <= lastDay; day.setDate(day.getDate() + 1)) {
-        // Check if it's a weekday (Monday=1 to Friday=5)
-        const dayOfWeek = day.getDay();
-        if (dayOfWeek > 0 && dayOfWeek < 6) {
-          workingDays++;
-          
-          // Check if there's data for this day
-          const dayKey = format(day, 'yyyy-MM-dd');
-          const storageKey = `checkIn_${user.id}_${dayKey}`;
-          const dayData = localStorage.getItem(storageKey);
-          
-          if (dayData) {
-            const data = JSON.parse(dayData);
-            if (data.totalTime) {
-              // Parse the time string (e.g., "8h 30m")
-              const timeParts = data.totalTime.split(' ');
-              let hours = 0;
-              let minutes = 0;
-              
-              for (let i = 0; i < timeParts.length; i++) {
-                if (timeParts[i].includes('h')) {
-                  hours = parseInt(timeParts[i].replace('h', '')) || 0;
-                } else if (timeParts[i].includes('m')) {
-                  minutes = parseInt(timeParts[i].replace('m', '')) || 0;
-                }
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    
+    // Get the first and last day of the current month
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    // Count working days (Monday to Friday) in the month
+    let workingDays = 0;
+    let totalMinutesWorked = 0;
+    
+    for (let day = new Date(firstDay); day <= lastDay; day.setDate(day.getDate() + 1)) {
+      // Check if it's a weekday (Monday=1 to Friday=5)
+      const dayOfWeek = day.getDay();
+      if (dayOfWeek > 0 && dayOfWeek < 6) {
+        workingDays++;
+        
+        // Check if there's data for this day
+        const dayKey = format(day, 'yyyy-MM-dd');
+        const storageKey = `checkIn_${user.id}_${dayKey}`;
+        const dayData = localStorage.getItem(storageKey);
+        
+        if (dayData) {
+          const data = JSON.parse(dayData);
+          if (data.totalTime) {
+            // Parse the time string (e.g., "8h 30m")
+            const timeParts = data.totalTime.split(' ');
+            let hours = 0;
+            let minutes = 0;
+            
+            for (let i = 0; i < timeParts.length; i++) {
+              if (timeParts[i].includes('h')) {
+                hours = parseInt(timeParts[i].replace('h', '')) || 0;
+              } else if (timeParts[i].includes('m')) {
+                minutes = parseInt(timeParts[i].replace('m', '')) || 0;
               }
-              
-              totalMinutesWorked += hours * 60 + minutes;
+            }
+            
+            totalMinutesWorked += hours * 60 + minutes;
             } else if (dayKey === today && data.checkInTime && isCheckedIn) {
               // Today and currently checked in - calculate from check-in to now
               const checkInTime = new Date(data.checkInTime);
@@ -700,28 +700,28 @@ const EmployeeDashboard = () => {
       // Calculate average daily hours worked (target: 9h/day)
       const avgMonthlyHours = workingDays > 0 ? 
         (totalMinutesWorked / 60) / workingDays : 0;
-      
-      // Format as "Xh Ym" or just "Xh" if no minutes
-      const hours = Math.floor(avgMonthlyHours);
-      const minutes = Math.round((avgMonthlyHours - hours) * 60);
-      const monthlyHours = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+    
+    // Format as "Xh Ym" or just "Xh" if no minutes
+    const hours = Math.floor(avgMonthlyHours);
+    const minutes = Math.round((avgMonthlyHours - hours) * 60);
+    const monthlyHours = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
 
-      // Calculate week hours (mock data)
-      const weekHours = '32h 15m';
-      const avgDaily = '6h 27m';
-      const pendingLeaves = 2;
-      const tasksCompleted = 8;
-      const tasksPending = 3;
+    // Calculate week hours (mock data)
+    const weekHours = '32h 15m';
+    const avgDaily = '6h 27m';
+    const pendingLeaves = 2;
+    const tasksCompleted = 8;
+    const tasksPending = 3;
 
-      setStats({
-        todayHours,
-        weekHours,
-        avgDaily,
-        pendingLeaves,
-        monthlyHours,
-        tasksCompleted,
-        tasksPending
-      });
+    setStats({
+      todayHours,
+      weekHours,
+      avgDaily,
+      pendingLeaves,
+      monthlyHours,
+      tasksCompleted,
+      tasksPending
+    });
     }
   };
 

@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Leave = require("../models/Leave");
 const Employee = require("../models/Employee");
+const Attendance = require("../models/Attendance");
 const { authenticateToken, requireAdmin } = require("../middleware/auth");
 
 // Helper function to calculate days difference
@@ -13,6 +14,23 @@ const differenceInDays = (date1, date2) => {
   firstDate.setHours(0, 0, 0, 0);
   secondDate.setHours(0, 0, 0, 0);
   return Math.round((secondDate - firstDate) / oneDay);
+};
+
+// Helper function to get all dates between start and end (inclusive)
+const getDatesBetween = (startDate, endDate) => {
+  const dates = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  
+  const currentDate = new Date(start);
+  while (currentDate <= end) {
+    dates.push(new Date(currentDate));
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  
+  return dates;
 };
 
 // @route   GET /api/leaves
@@ -190,6 +208,57 @@ router.put("/:id/approve", authenticateToken, requireAdmin, async (req, res) => 
     leave.reviewedBy = req.user._id;
     
     await leave.save();
+    
+    // Create attendance records for each day in the leave period
+    try {
+      const leaveDates = getDatesBetween(leave.startDate, leave.endDate);
+      let recordsCreated = 0;
+      
+      // Process each date in the leave period
+      for (const date of leaveDates) {
+        // Skip weekends (Saturday = 6, Sunday = 0)
+        const dayOfWeek = date.getDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+          continue; // Skip weekends
+        }
+        
+        // Normalize date to midnight
+        const normalizedDate = new Date(date);
+        normalizedDate.setHours(0, 0, 0, 0);
+        
+        // Check if attendance record already exists for this date
+        const existingRecord = await Attendance.findOne({
+          employeeId: leave.employeeId,
+          date: normalizedDate
+        });
+        
+        if (existingRecord) {
+          // Update existing record to mark as Leave
+          existingRecord.status = "Leave";
+          // Clear inTime and outTime if they exist (since employee is on leave)
+          existingRecord.inTime = undefined;
+          existingRecord.outTime = undefined;
+          await existingRecord.save();
+          recordsCreated++;
+        } else {
+          // Create new attendance record with Leave status
+          const attendanceRecord = new Attendance({
+            employeeId: leave.employeeId,
+            date: normalizedDate,
+            status: "Leave",
+            location: "Office"
+          });
+          await attendanceRecord.save();
+          recordsCreated++;
+        }
+      }
+      
+      console.log(`✅ Created/updated ${recordsCreated} attendance records for approved leave`);
+    } catch (attendanceError) {
+      console.error("Error creating attendance records for leave:", attendanceError);
+      // Don't fail the leave approval if attendance record creation fails
+      // The leave is still approved, just attendance records might not be created
+    }
     
     // Populate data
     await leave.populate("employeeId", "name email department");

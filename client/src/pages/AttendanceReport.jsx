@@ -130,7 +130,8 @@ const AttendanceReport = () => {
                 status = 'leave';
                 leaveDays++;
               } else if (dbStatus === 'Absent') {
-                status = 'absent';
+                status = 'leave';
+                leaveDays++;
               } else if (record.inTime) {
                 // Has check-in time
                 const inTimeDate = new Date(record.inTime);
@@ -181,15 +182,33 @@ const AttendanceReport = () => {
                   totalHours += hoursWorked;
                 } else {
                   // Checked in but not checked out yet
-                  status = isLate ? 'late' : 'present';
-                  presentDays++;
-                  // Don't count hours if not checked out
+                  // If it's a past day (not today) and no checkout, treat as leave
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const recordDate = new Date(date);
+                  recordDate.setHours(0, 0, 0, 0);
+                  
+                  if (recordDate < today) {
+                    // Past day without checkout - count as leave
+                    status = 'leave';
+                    leaveDays++;
+                  } else {
+                    // Today - still active
+                    status = isLate ? 'late' : 'present';
+                    presentDays++;
+                    // Don't count hours if not checked out
+                  }
                 }
               } else {
                 // Present status but no inTime (shouldn't happen, but handle it)
                 status = 'present';
                 presentDays++;
               }
+            } else {
+              // No record at all - employee didn't check in or check out on this working day
+              // Count as leave day
+              status = 'leave';
+              leaveDays++;
             }
             
             attendanceRecords.push({
