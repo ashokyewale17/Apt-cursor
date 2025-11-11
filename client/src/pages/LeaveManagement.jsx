@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
-import { Plus, Calendar, Clock, Check, X, Eye, Filter } from 'lucide-react';
-import { format, addDays, differenceInDays } from 'date-fns';
+import { Plus, Calendar, Clock, Check, X, Eye, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, addDays, differenceInDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, getDay, startOfWeek, endOfWeek } from 'date-fns';
+import logo from '../assets/apt.ico';
 
 const LeaveManagement = () => {
   const { user } = useAuth();
@@ -20,6 +21,10 @@ const LeaveManagement = () => {
   const [showUsedLeaveModal, setShowUsedLeaveModal] = useState(false);
   const [showPendingRequestsModal, setShowPendingRequestsModal] = useState(false);
   const [showApprovedLeavesModal, setShowApprovedLeavesModal] = useState(false);
+  const [showRejectedRequestsModal, setShowRejectedRequestsModal] = useState(false);
+  
+  // Calendar state for holidays
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
 
   const [leaveForm, setLeaveForm] = useState({
     type: 'vacation',
@@ -226,6 +231,7 @@ const LeaveManagement = () => {
   const calculateLeaveDetails = () => {
     const approvedLeaves = displayRequests.filter(l => l.status === 'approved');
     const pendingLeaves = displayRequests.filter(l => l.status === 'pending');
+    const rejectedLeaves = displayRequests.filter(l => l.status === 'rejected');
     
     // Calculate total days used
     const totalDaysUsed = approvedLeaves.reduce((acc, l) => acc + l.days, 0);
@@ -276,19 +282,107 @@ const LeaveManagement = () => {
       approvedDate: format(leave.approvedDate || leave.appliedDate, 'MMM dd, yyyy')
     }));
     
+    // Calculate rejected requests details
+    const rejectedRequestsDetails = rejectedLeaves.map(leave => ({
+      ...leave,
+      type: leave.type,
+      days: leave.days,
+      period: `${format(leave.startDate, 'MMM dd')} - ${format(leave.endDate, 'MMM dd')}`,
+      appliedDate: format(leave.appliedDate, 'MMM dd, yyyy'),
+      rejectedDate: format(leave.approvedDate || leave.appliedDate, 'MMM dd, yyyy')
+    }));
+    
     return {
       monthlyLeaveData,
       usedLeaveDetails,
       pendingRequestsDetails,
       approvedLeavesDetails,
+      rejectedRequestsDetails,
       totalRemaining,
       totalUsed: totalDaysUsed,
       totalPending: pendingLeaves.length,
-      totalApproved: approvedLeaves.length
+      totalApproved: approvedLeaves.length,
+      totalRejected: rejectedLeaves.length
     };
   };
 
   const leaveDetails = calculateLeaveDetails();
+
+  // Function to get national holidays for a given year
+  const getNationalHolidays = (year) => {
+    const holidays = [
+      // Fixed date holidays
+      { date: `${year}-01-26`, name: 'Republic Day' },
+      { date: `${year}-08-15`, name: 'Independence Day' },
+      { date: `${year}-10-02`, name: 'Gandhi Jayanti' },
+      { date: `${year}-12-25`, name: 'Christmas' },
+      
+      // Common holidays (you can add more based on your country/region)
+      { date: `${year}-01-01`, name: 'New Year' },
+      { date: `${year}-05-01`, name: 'Labour Day' },
+      { date: `${year}-10-31`, name: 'Halloween' },
+      
+      // Add more holidays as needed
+    ];
+    
+    return holidays.map(holiday => ({
+      ...holiday,
+      dateObj: new Date(holiday.date)
+    }));
+  };
+
+  // Get holidays for current calendar month
+  const currentYear = calendarMonth.getFullYear();
+  const nationalHolidays = getNationalHolidays(currentYear);
+  const monthStart = startOfMonth(calendarMonth);
+  const monthEnd = endOfMonth(calendarMonth);
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+
+  // Check if a date is a holiday
+  const isHoliday = (date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return nationalHolidays.some(h => format(h.dateObj, 'yyyy-MM-dd') === dateStr);
+  };
+
+  // Get holiday name for a date
+  const getHolidayName = (date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const holiday = nationalHolidays.find(h => format(h.dateObj, 'yyyy-MM-dd') === dateStr);
+    return holiday ? holiday.name : null;
+  };
+
+  // Check if a date is in the current month
+  const isCurrentMonth = (date) => {
+    return date.getMonth() === calendarMonth.getMonth();
+  };
+
+  // Check if a date is today
+  const isToday = (date) => {
+    return isSameDay(date, new Date());
+  };
+
+  // Check if a date has a leave request
+  const hasLeaveRequest = (date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return displayRequests.some(leave => {
+      const start = format(leave.startDate, 'yyyy-MM-dd');
+      const end = format(leave.endDate, 'yyyy-MM-dd');
+      return dateStr >= start && dateStr <= end;
+    });
+  };
+
+  // Get leave status for a date
+  const getLeaveStatus = (date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const leave = displayRequests.find(leave => {
+      const start = format(leave.startDate, 'yyyy-MM-dd');
+      const end = format(leave.endDate, 'yyyy-MM-dd');
+      return dateStr >= start && dateStr <= end;
+    });
+    return leave ? leave.status : null;
+  };
 
   return (
     <div style={{ padding: '1rem' }}>
@@ -324,9 +418,33 @@ const LeaveManagement = () => {
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '0.5rem', background: 'linear-gradient(45deg, #fff, #f0f9ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                📋 Leave Management
-              </h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '12px',
+                  padding: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)'
+                }}>
+                  <img 
+                    src={logo} 
+                    alt="Leave Management Logo" 
+                    style={{ 
+                      height: '48px', 
+                      width: '48px', 
+                      objectFit: 'contain',
+                      filter: 'brightness(0) invert(1)',
+                      opacity: 0.95
+                    }} 
+                  />
+                </div>
+                <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', margin: 0, background: 'linear-gradient(45deg, #fff, #f0f9ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  Leave Management
+                </h1>
+              </div>
               <p style={{ fontSize: '1.125rem', opacity: 0.9 }}>
                 {user.role === 'admin' ? 'Manage employee leave requests and track team availability' : 'Apply for leave and track your requests'}
               </p>
@@ -637,6 +755,333 @@ const LeaveManagement = () => {
               <span style={{ fontWeight: '600' }}>
                 {Math.round((leaveDetails.totalUsed / 12) * 100)}%
               </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Rejected Requests Card - Only for Admin */}
+        {user.role === 'admin' && (
+          <div style={{
+            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+            borderRadius: '1rem',
+            padding: '2rem',
+            color: 'white',
+            position: 'relative',
+            overflow: 'hidden',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease'
+          }}
+          onClick={() => setShowRejectedRequestsModal(true)}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'translateY(-5px) scale(1.02)';
+            e.target.style.boxShadow = '0 20px 40px rgba(239, 68, 68, 0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'translateY(0) scale(1)';
+            e.target.style.boxShadow = 'none';
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: '-30px',
+              right: '-30px',
+              width: '120px',
+              height: '120px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: '50%'
+            }}></div>
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  padding: '0.75rem',
+                  borderRadius: '12px',
+                  backdropFilter: 'blur(10px)'
+                }}>
+                  <X size={24} />
+                </div>
+                <div style={{ fontSize: '3rem', fontWeight: '800', fontFamily: 'monospace' }}>
+                  {leaveDetails.totalRejected}
+                </div>
+              </div>
+              <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>Rejected Requests</div>
+              <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>This year</div>
+              {leaveDetails.totalRejected > 0 && (
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '0.5rem',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '8px',
+                  fontSize: '0.75rem'
+                }}>
+                  ⚠️ Review rejection reasons
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* National Holidays Calendar */}
+      <div className="card" style={{ marginBottom: '2rem' }}>
+        <div className="card-header">
+          <h3 className="card-title">
+            <Calendar size={20} style={{ marginRight: '0.5rem' }} />
+            National Holidays Calendar
+          </h3>
+        </div>
+        <div className="card-body">
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: '1fr auto 1fr',
+            alignItems: 'center',
+            marginBottom: '1.5rem',
+            gap: '1rem'
+          }}>
+            <div></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <button
+                onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}
+                style={{
+                  background: 'var(--background-alt)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  padding: '0.5rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = 'var(--primary-color)';
+                  e.target.style.color = 'white';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'var(--background-alt)';
+                  e.target.style.color = 'var(--text-primary)';
+                }}
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <h3 style={{ margin: 0, minWidth: '200px', textAlign: 'center' }}>
+                {format(calendarMonth, 'MMMM yyyy')}
+              </h3>
+              <button
+                onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}
+                style={{
+                  background: 'var(--background-alt)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  padding: '0.5rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = 'var(--primary-color)';
+                  e.target.style.color = 'white';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'var(--background-alt)';
+                  e.target.style.color = 'var(--text-primary)';
+                }}
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', fontSize: '0.875rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ width: '16px', height: '16px', background: '#ef4444', borderRadius: '4px' }}></div>
+                <span>National Holiday</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ width: '16px', height: '16px', background: '#10b981', borderRadius: '4px' }}></div>
+                <span>Approved Leave</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ width: '16px', height: '16px', background: '#f59e0b', borderRadius: '4px' }}></div>
+                <span>Pending Leave</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Calendar Grid */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(7, 1fr)',
+            gap: '0.5rem'
+          }}>
+            {/* Day Headers */}
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              <div 
+                key={day}
+                style={{
+                  textAlign: 'center',
+                  fontWeight: '600',
+                  padding: '0.75rem',
+                  color: 'var(--text-secondary)',
+                  fontSize: '0.875rem'
+                }}
+              >
+                {day}
+              </div>
+            ))}
+
+            {/* Calendar Days */}
+            {calendarDays.map((day, index) => {
+              const holiday = isHoliday(day);
+              const holidayName = getHolidayName(day);
+              const inCurrentMonth = isCurrentMonth(day);
+              const today = isToday(day);
+              const hasLeave = hasLeaveRequest(day);
+              const leaveStatus = getLeaveStatus(day);
+              const isWeekend = getDay(day) === 0 || getDay(day) === 6;
+
+              return (
+                <div
+                  key={index}
+                  style={{
+                    aspectRatio: '1',
+                    padding: '0.5rem',
+                    borderRadius: '8px',
+                    background: today 
+                      ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                      : holiday
+                      ? '#fef2f2'
+                      : hasLeave && leaveStatus === 'approved'
+                      ? '#ecfdf5'
+                      : hasLeave && leaveStatus === 'pending'
+                      ? '#fffbeb'
+                      : hasLeave && leaveStatus === 'rejected'
+                      ? '#fef2f2'
+                      : !inCurrentMonth
+                      ? 'var(--background-alt)'
+                      : 'var(--background)',
+                    border: today 
+                      ? '2px solid #667eea'
+                      : holiday
+                      ? '2px solid #ef4444'
+                      : hasLeave
+                      ? `2px solid ${leaveStatus === 'approved' ? '#10b981' : leaveStatus === 'pending' ? '#f59e0b' : '#ef4444'}`
+                      : '1px solid var(--border-color)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    position: 'relative',
+                    opacity: inCurrentMonth ? 1 : 0.4
+                  }}
+                  onMouseEnter={(e) => {
+                    if (inCurrentMonth) {
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                  title={holidayName || (hasLeave ? `${leaveStatus} leave` : format(day, 'MMMM dd, yyyy'))}
+                >
+                  <div style={{
+                    fontSize: '0.875rem',
+                    fontWeight: today ? '700' : '500',
+                    color: today 
+                      ? 'white'
+                      : holiday
+                      ? '#ef4444'
+                      : hasLeave
+                      ? leaveStatus === 'approved' ? '#10b981' : leaveStatus === 'pending' ? '#f59e0b' : '#ef4444'
+                      : isWeekend && inCurrentMonth
+                      ? 'var(--text-secondary)'
+                      : 'var(--text-primary)',
+                    marginBottom: '0.25rem'
+                  }}>
+                    {format(day, 'd')}
+                  </div>
+                  {holiday && (
+                    <div style={{
+                      fontSize: '0.625rem',
+                      color: '#ef4444',
+                      fontWeight: '600',
+                      textAlign: 'center',
+                      lineHeight: '1.2',
+                      marginTop: '0.25rem'
+                    }}>
+                      🎉
+                    </div>
+                  )}
+                  {hasLeave && !holiday && (
+                    <div style={{
+                      fontSize: '0.625rem',
+                      color: leaveStatus === 'approved' ? '#10b981' : leaveStatus === 'pending' ? '#f59e0b' : '#ef4444',
+                      fontWeight: '600',
+                      textAlign: 'center',
+                      lineHeight: '1.2',
+                      marginTop: '0.25rem'
+                    }}>
+                      {leaveStatus === 'approved' ? '✓' : leaveStatus === 'pending' ? '⏳' : '✗'}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Holiday List */}
+          <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
+            <h4 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Upcoming Holidays</h4>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gap: '0.75rem'
+            }}>
+              {nationalHolidays
+                .filter(h => h.dateObj >= new Date())
+                .sort((a, b) => a.dateObj - b.dateObj)
+                .slice(0, 6)
+                .map((holiday, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      background: 'var(--background-alt)',
+                      padding: '0.75rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem'
+                    }}
+                  >
+                    <div style={{
+                      background: '#ef4444',
+                      color: 'white',
+                      borderRadius: '50%',
+                      width: '32px',
+                      height: '32px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      flexShrink: 0
+                    }}>
+                      {format(holiday.dateObj, 'd')}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: '600', fontSize: '0.875rem', marginBottom: '0.25rem' }}>
+                        {holiday.name}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        {format(holiday.dateObj, 'MMMM dd, yyyy')}
+                      </div>
+                    </div>
+                  </div>
+                ))}
             </div>
           </div>
         </div>
@@ -1636,6 +2081,153 @@ const LeaveManagement = () => {
             <div className="modal-footer">
               <button 
                 onClick={() => setShowApprovedLeavesModal(false)}
+                className="btn btn-secondary"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rejected Requests Detail Modal */}
+      {showRejectedRequestsModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '700px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Rejected Requests</h3>
+              <button
+                onClick={() => setShowRejectedRequestsModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary)',
+                  padding: '0.5rem',
+                  borderRadius: '50%',
+                  transition: 'all 0.2s ease',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = 'var(--background-alt)';
+                  e.target.style.color = 'var(--text-primary)';
+                  e.target.style.transform = 'scale(1.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'none';
+                  e.target.style.color = 'var(--text-secondary)';
+                  e.target.style.transform = 'scale(1)';
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 0.5rem 0' }}>Rejected Requests</h4>
+                    <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+                      {leaveDetails.totalRejected} request(s) rejected this year
+                    </p>
+                  </div>
+                  <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ef4444' }}>
+                    {leaveDetails.totalRejected}
+                  </div>
+                </div>
+              </div>
+
+              <h4 style={{ marginBottom: '1rem' }}>Rejected Requests Details</h4>
+              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                {leaveDetails.rejectedRequestsDetails.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {leaveDetails.rejectedRequestsDetails.map((leave, index) => (
+                      <div 
+                        key={index} 
+                        style={{
+                          background: 'var(--background)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '8px',
+                          padding: '1rem'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                              <span style={{ fontSize: '1.5rem' }}>{getLeaveTypeEmoji(leave.type)}</span>
+                              <div>
+                                <div style={{ fontWeight: '600', textTransform: 'capitalize' }}>
+                                  {leave.type} Leave
+                                </div>
+                                {user.role === 'admin' && leave.employee && (
+                                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                                    <div style={{ fontWeight: '500' }}>{leave.employee.name}</div>
+                                    {leave.employee.department && (
+                                      <div style={{ fontSize: '0.75rem' }}>{leave.employee.department}</div>
+                                    )}
+                                  </div>
+                                )}
+                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                                  {leave.period}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.25rem' }}>
+                                  Applied on {leave.appliedDate} • Rejected on {leave.rejectedDate}
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ 
+                              fontSize: '0.875rem', 
+                              color: 'var(--text-secondary)',
+                              marginTop: '0.5rem',
+                              fontStyle: 'italic'
+                            }}>
+                              "{leave.reason}"
+                            </div>
+                            {leave.rejectionReason && (
+                              <div style={{ 
+                                marginTop: '0.75rem',
+                                padding: '0.75rem',
+                                background: '#fef2f2',
+                                border: '1px solid #fecaca',
+                                borderRadius: '6px',
+                                fontSize: '0.875rem'
+                              }}>
+                                <div style={{ fontWeight: '600', color: '#991b1b', marginBottom: '0.25rem' }}>
+                                  Rejection Reason:
+                                </div>
+                                <div style={{ color: '#991b1b' }}>
+                                  "{leave.rejectionReason}"
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#ef4444' }}>
+                              {leave.days} {leave.days === 1 ? 'day' : 'days'}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                              Rejected
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                    No rejected leave requests found
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                onClick={() => setShowRejectedRequestsModal(false)}
                 className="btn btn-secondary"
               >
                 Close
