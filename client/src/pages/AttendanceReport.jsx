@@ -66,47 +66,24 @@ const AttendanceReport = () => {
     setIsLoading(true);
     
     try {
-      // Fetch attendance data and leave requests for all employees in parallel
+      // Fetch attendance data for all employees in parallel
       const attendancePromises = employees.map(async (employee) => {
         try {
           const month = selectedMonth + 1; // API expects 1-12, not 0-11
-          const attendanceResponse = await fetch(`/api/attendance-records/employee/${employee.id}/${month}/${selectedYear}`);
-          const records = attendanceResponse.ok ? await attendanceResponse.json() : [];
+          const response = await fetch(`/api/attendance-records/employee/${employee.id}/${month}/${selectedYear}`);
+          const records = await response.ok ? await response.json() : [];
           
-          // Fetch approved leave requests for this employee
-          const token = localStorage.getItem('token');
-          const leavesResponse = await fetch('/api/leaves', {
-            headers: {
-              'Authorization': token ? `Bearer ${token}` : undefined
-            }
-          });
-          const allLeaves = leavesResponse.ok ? await leavesResponse.json() : [];
-          
-          // Filter approved leaves for this employee in the selected month
-          const employeeLeaves = allLeaves.filter(leave => {
-            if (leave.employee.id.toString() !== employee.id.toString() || leave.status !== 'approved') {
-              return false;
-            }
-            const leaveStart = new Date(leave.startDate);
-            const leaveEnd = new Date(leave.endDate);
-            const monthStart = new Date(selectedYear, selectedMonth, 1);
-            const monthEnd = new Date(selectedYear, selectedMonth + 1, 0);
-            
-            // Check if leave overlaps with the selected month
-            return (leaveStart <= monthEnd && leaveEnd >= monthStart);
-          });
-          
-          return { employee, records: Array.isArray(records) ? records : [], leaves: employeeLeaves };
+          return { employee, records: Array.isArray(records) ? records : [] };
         } catch (error) {
           console.error(`Error fetching attendance for employee ${employee.id}:`, error);
-          return { employee, records: [], leaves: [] };
+          return { employee, records: [] };
         }
       });
       
       const attendanceData = await Promise.all(attendancePromises);
       
       const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-      const monthlyData = attendanceData.map(({ employee, records, leaves }) => {
+      const monthlyData = attendanceData.map(({ employee, records }) => {
         const attendanceRecords = [];
         let presentDays = 0;
         let totalHours = 0;
@@ -121,29 +98,6 @@ const AttendanceReport = () => {
           const recordDate = new Date(record.date);
           const day = recordDate.getDate();
           recordsMap.set(day, record);
-        });
-        
-        // Create a set of dates that are covered by approved leave requests
-        const leaveDatesSet = new Set();
-        leaves.forEach(leave => {
-          const leaveStart = new Date(leave.startDate);
-          const leaveEnd = new Date(leave.endDate);
-          const monthStart = new Date(selectedYear, selectedMonth, 1);
-          const monthEnd = new Date(selectedYear, selectedMonth + 1, 0);
-          
-          // Get the range of dates that overlap with the selected month
-          const startDate = leaveStart < monthStart ? monthStart : leaveStart;
-          const endDate = leaveEnd > monthEnd ? monthEnd : leaveEnd;
-          
-          // Add all dates in the leave range to the set
-          for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-            const dayOfMonth = d.getDate();
-            const dateInMonth = new Date(selectedYear, selectedMonth, dayOfMonth);
-            // Only include if it's the same month (to handle edge cases)
-            if (dateInMonth.getMonth() === selectedMonth) {
-              leaveDatesSet.add(dayOfMonth);
-            }
-          }
         });
         
         // Process each day of the month
@@ -235,15 +189,6 @@ const AttendanceReport = () => {
                 // Present status but no inTime (shouldn't happen, but handle it)
                 status = 'present';
                 presentDays++;
-              }
-            } else {
-              // No attendance record - check if there's an approved leave request for this day
-              // Only count as leave if it's not a weekend
-              if (leaveDatesSet.has(day) && !isWeekendDay) {
-                status = 'leave';
-                leaveDays++;
-              } else {
-                status = 'absent';
               }
             }
             
