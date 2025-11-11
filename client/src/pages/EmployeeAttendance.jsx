@@ -130,38 +130,14 @@ const EmployeeAttendance = () => {
           } else if (dbStatus === 'Absent') {
             status = 'absent';
             notes = 'Absent';
-          } else if (dbStatus === 'HalfDay') {
-            status = 'completed';
-            notes = 'Half Day';
-            if (record.inTime) checkIn = new Date(record.inTime);
-            if (record.outTime) {
-              checkOut = new Date(record.outTime);
-              const diffMs = checkOut - checkIn;
-              const hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
-              const hours = Math.floor(hoursWorked);
-              const minutes = Math.round((hoursWorked - hours) * 60);
-              totalHours = `${hours}h ${minutes}m`;
-            }
-          } else if (dbStatus === 'EarlyLeave') {
-            status = 'completed';
-            notes = 'Early Leave';
-            if (record.inTime) checkIn = new Date(record.inTime);
-            if (record.outTime) {
-              checkOut = new Date(record.outTime);
-              const diffMs = checkOut - checkIn;
-              const hoursWorked = Math.max(0, diffMs / (1000 * 60 * 60));
-              const hours = Math.floor(hoursWorked);
-              const minutes = Math.round((hoursWorked - hours) * 60);
-              totalHours = `${hours}h ${minutes}m`;
-            }
           } else if (record.inTime) {
             // Has check-in time
             checkIn = new Date(record.inTime);
             
-            // Determine if late (check-in after 8:30 AM) - but only if lateMark is true
+            // Determine if late (check-in after 9:30 AM)
             const lateThreshold = new Date(checkIn);
-            lateThreshold.setHours(8, 30, 0, 0);
-            const isLate = record.lateMark || (checkIn > lateThreshold);
+            lateThreshold.setHours(9, 30, 0, 0);
+            const isLate = checkIn > lateThreshold;
             
             if (record.outTime) {
               // Has check-out time - completed day
@@ -175,13 +151,13 @@ const EmployeeAttendance = () => {
               totalHours = `${hours}h ${minutes}m`;
               
               status = 'completed';
-              if (isLate && record.lateMark) {
+              if (isLate) {
                 notes = 'Late arrival';
               }
             } else {
               // Checked in but not checked out yet - active day
               status = isToday ? 'active' : 'completed';
-              if (isLate && record.lateMark) {
+              if (isLate) {
                 notes = 'Late arrival';
               }
             }

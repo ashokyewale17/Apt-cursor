@@ -154,22 +154,6 @@ router.post("/checkin", async (req, res) => {
     
     console.log('Found employee for check-in:', employee.name, employee._id);
     
-    // Get current time for validation
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentTimeInMinutes = currentHour * 60 + currentMinute;
-    
-    // Validate check-in time window: 8:30 AM (510 minutes) to 10:00 PM (1320 minutes)
-    const minCheckInTime = 8 * 60 + 30; // 8:30 AM = 510 minutes
-    const maxCheckInTime = 22 * 60; // 10:00 PM = 1320 minutes
-    
-    if (currentTimeInMinutes < minCheckInTime || currentTimeInMinutes > maxCheckInTime) {
-      return res.status(400).json({ 
-        error: "Check-in is only allowed between 8:30 AM and 10:00 PM"
-      });
-    }
-    
     // Get today's date
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -211,21 +195,14 @@ router.post("/checkin", async (req, res) => {
       });
     }
     
-    // Check if check-in is late (after 8:30 AM)
-    const checkInTime = new Date(now);
-    const lateThreshold = new Date(checkInTime);
-    lateThreshold.setHours(8, 30, 0, 0);
-    const isLate = checkInTime > lateThreshold;
-    
     // Create new attendance record with proper ObjectId
     attendanceRecord = new Attendance({
       employeeId: employee._id,
       date: today,
-      inTime: now,
+      inTime: new Date(),
       status: isCompOff ? "CompOff" : "Present",
       location: location || "Office",
-      compOff: isCompOff,
-      lateMark: isLate && !isCompOff
+      compOff: isCompOff
     });
     
     await attendanceRecord.save();
@@ -297,22 +274,6 @@ router.post("/checkout", async (req, res) => {
     
     console.log('Found employee for check-out:', employee.name, employee._id);
     
-    // Get current time for validation
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentTimeInMinutes = currentHour * 60 + currentMinute;
-    
-    // Validate check-out time window: 8:30 AM (510 minutes) to 10:00 PM (1320 minutes)
-    const minCheckOutTime = 8 * 60 + 30; // 8:30 AM = 510 minutes
-    const maxCheckOutTime = 22 * 60; // 10:00 PM = 1320 minutes
-    
-    if (currentTimeInMinutes < minCheckOutTime || currentTimeInMinutes > maxCheckOutTime) {
-      return res.status(400).json({ 
-        error: "Check-out is only allowed between 8:30 AM and 10:00 PM"
-      });
-    }
-    
     // Get today's date
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -337,61 +298,16 @@ router.post("/checkout", async (req, res) => {
     }
     
     // Update checkout time
-    attendanceRecord.outTime = now;
+    attendanceRecord.outTime = new Date();
+    await attendanceRecord.save();
     
-    // Calculate hours worked (in decimal hours)
+    // Calculate hours worked
     const checkInTime = new Date(attendanceRecord.inTime);
     const checkOutTime = new Date(attendanceRecord.outTime);
     const diffMs = checkOutTime - checkInTime;
-    const hoursWorkedDecimal = diffMs / (1000 * 60 * 60); // Total hours as decimal
-    const diffHours = Math.floor(hoursWorkedDecimal);
-    const diffMinutes = Math.floor((hoursWorkedDecimal - diffHours) * 60);
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     const hoursWorked = `${diffHours}h ${diffMinutes}m`;
-    
-    // Determine attendance status based on hours worked
-    let newStatus = attendanceRecord.status;
-    let shouldRemoveLateMark = false;
-    
-    // Check if check-in and check-out are within valid time window (8:30 AM to 10:00 PM)
-    const checkInHour = checkInTime.getHours();
-    const checkInMinute = checkInTime.getMinutes();
-    const checkInTimeInMinutes = checkInHour * 60 + checkInMinute;
-    const checkOutHour = checkOutTime.getHours();
-    const checkOutMinute = checkOutTime.getMinutes();
-    const checkOutTimeInMinutes = checkOutHour * 60 + checkOutMinute;
-    
-    const isValidTimeWindow = checkInTimeInMinutes >= minCheckOutTime && 
-                               checkInTimeInMinutes <= maxCheckOutTime &&
-                               checkOutTimeInMinutes >= minCheckOutTime && 
-                               checkOutTimeInMinutes <= maxCheckOutTime;
-    
-    if (isValidTimeWindow && !attendanceRecord.compOff) {
-      // Apply attendance rules only if within valid time window and not comp off
-      if (hoursWorkedDecimal < 3) {
-        // Less than 3 hours → Leave
-        newStatus = "Leave";
-      } else if (hoursWorkedDecimal >= 3.5 && hoursWorkedDecimal < 6.5) {
-        // Between 3.5 and 6.5 hours → Half Day
-        newStatus = "HalfDay";
-      } else if (hoursWorkedDecimal >= 6.5 && hoursWorkedDecimal < 8.5) {
-        // Between 6.5 and 8.5 hours → Early Leave
-        newStatus = "EarlyLeave";
-      } else if (hoursWorkedDecimal >= 9) {
-        // 9 hours or more → Present (and remove late marks)
-        newStatus = "Present";
-        shouldRemoveLateMark = true;
-      }
-      // If between 3 and 3.5 hours, or between 8.5 and 9 hours, keep existing status
-    }
-    
-    // Update attendance record
-    attendanceRecord.status = newStatus;
-    attendanceRecord.hoursWorked = Math.round(hoursWorkedDecimal * 100) / 100; // Round to 2 decimal places
-    if (shouldRemoveLateMark) {
-      attendanceRecord.lateMark = false;
-    }
-    
-    await attendanceRecord.save();
     
     // Use employee object directly (already fetched) instead of relying on populate
     const employeeName = employee.name || 'Unknown';

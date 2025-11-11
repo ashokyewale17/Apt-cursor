@@ -291,24 +291,20 @@ const AdminDashboard = () => {
               
               if (dbStatus === 'Leave' || dbStatus === 'Holiday' || dbStatus === 'Absent') {
                 status = 'absent';
-              } else if (dbStatus === 'HalfDay') {
-                status = 'half';
-              } else if (dbStatus === 'EarlyLeave') {
-                status = 'early';
               } else if (record.inTime) {
-                // Determine if late (check-in after 8:30 AM) - but only if lateMark is true
+                // Determine if late (check-in after 9:30 AM)
                 const inTimeDate = new Date(record.inTime);
                 const lateThreshold = new Date(inTimeDate);
-                lateThreshold.setHours(8, 30, 0, 0);
-                const isLate = record.lateMark || (inTimeDate > lateThreshold);
+                lateThreshold.setHours(9, 30, 0, 0);
+                const isLate = inTimeDate > lateThreshold;
                 
                 if (record.outTime) {
                   // Completed day
-                  status = (isLate && record.lateMark) ? 'late' : 'present';
+                  status = isLate ? 'late' : 'present';
                 } else {
                   // Active day (checked in but not out)
                   if (isToday) {
-                    status = (isLate && record.lateMark) ? 'late' : 'present';
+                    status = isLate ? 'late' : 'present';
                   } else {
                     status = 'present'; // Past day without check-out
                   }
