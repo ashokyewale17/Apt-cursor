@@ -5,6 +5,7 @@ const Employee = require("../models/Employee");
 const { authenticateToken, requireAdmin } = require("../middleware/auth");
 
 // Helper function to calculate days difference
+// Returns the number of days between date1 and date2 (date2 - date1)
 const differenceInDays = (date1, date2) => {
   const oneDay = 24 * 60 * 60 * 1000; // hours*minutes*seconds*milliseconds
   const firstDate = new Date(date1);
@@ -113,7 +114,8 @@ router.post("/", authenticateToken, async (req, res) => {
     }
     
     // Calculate days (inclusive of both start and end dates)
-    const days = differenceInDays(end, start) + 1;
+    // differenceInDays returns (date2 - date1), so we pass (start, end) to get (end - start)
+    const days = differenceInDays(start, end) + 1;
     
     if (days < 1) {
       return res.status(400).json({ message: "Leave duration must be at least 1 day" });

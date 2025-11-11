@@ -258,11 +258,35 @@ const AdminDashboard = () => {
       // Filter out admins - admins don't check in/out
       const nonAdminEmployees = realEmployees.filter(emp => !isAdmin(emp));
       
-      // Fetch attendance data for non-admin employees in parallel
+      // Fetch attendance data and leave requests for non-admin employees in parallel
       const attendancePromises = nonAdminEmployees.map(async (employee) => {
         try {
           const response = await fetch(`/api/attendance-records/employee/${employee.id}/${month}/${year}`);
           const records = response.ok ? await response.json() : [];
+          
+          // Fetch approved leave requests for this employee
+          const token = localStorage.getItem('token');
+          const leavesResponse = await fetch('/api/leaves', {
+            headers: {
+              'Authorization': token ? `Bearer ${token}` : undefined
+            }
+          });
+          const allLeaves = leavesResponse.ok ? await leavesResponse.json() : [];
+          
+          // Filter approved leaves for this employee
+          const employeeLeaves = allLeaves.filter(leave => {
+            return leave.employee.id.toString() === employee.id.toString() && leave.status === 'approved';
+          });
+          
+          // Create a set of dates covered by approved leave requests
+          const leaveDatesSet = new Set();
+          employeeLeaves.forEach(leave => {
+            const leaveStart = new Date(leave.startDate);
+            const leaveEnd = new Date(leave.endDate);
+            for (let d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
+              leaveDatesSet.add(format(d, 'yyyy-MM-dd'));
+            }
+          });
           
           // Process last 7 days
           const weeklyData = Array.from({ length: 7 }, (_, i) => {
@@ -289,7 +313,9 @@ const AdminDashboard = () => {
               const dbStatus = record.status || 'Present';
               let status = 'absent';
               
-              if (dbStatus === 'Leave' || dbStatus === 'Holiday' || dbStatus === 'Absent') {
+              if (dbStatus === 'Leave' || dbStatus === 'Holiday') {
+                status = 'leave';
+              } else if (dbStatus === 'Absent') {
                 status = 'absent';
               } else if (record.inTime) {
                 // Determine if late (check-in after 9:30 AM)
@@ -319,7 +345,16 @@ const AdminDashboard = () => {
               };
             }
             
-            // No record found
+            // No record found - check if there's an approved leave request for this day
+            if (leaveDatesSet.has(dateKey)) {
+              return {
+                date: format(date, 'EEE'),
+                status: 'leave',
+                fullDate: dateKey,
+                isToday
+              };
+            }
+            
             // Check if it's today and employee is active
             if (isToday && (employee.status === 'active' || employee.status === 'completed')) {
               return {
