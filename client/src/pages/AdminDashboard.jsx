@@ -8,7 +8,7 @@ import {
   Filter, Search, Plus, ArrowUpRight, ArrowDownRight, Eye, Edit, Trash2,
   MapPin, Phone, Mail, Star, Briefcase, UserPlus, GitBranch, PieChart, TrendingDown, Edit3, X, Save
 } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, isToday, isThisWeek, startOfWeek, endOfWeek, isSameDay, startOfDay, endOfDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, isToday, isThisWeek, startOfWeek, endOfWeek } from 'date-fns';
 
 
 // Add pulse animation styles
@@ -57,7 +57,6 @@ const AdminDashboard = () => {
   const [weeklyAttendanceData, setWeeklyAttendanceData] = useState(new Map()); // Map of employeeId -> weekly data
 
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const isFetchingRef = useRef(false); // Prevent multiple simultaneous fetches
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
@@ -183,241 +182,74 @@ const AdminDashboard = () => {
     });
   }, []);
 
+  // Real-time check for employee check-ins (optimized to prevent spam)
+  const checkForEmployeeCheckIns = useCallback(async () => {
+    try {
+      console.log('🔄 Polling for attendance updates...');
+      // Fetch today's attendance records from database with cache-busting
+      const timestamp = Date.now();
+      const response = await fetch(`/api/attendance-records/today/all?_t=${timestamp}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        cache: 'no-store' // Additional cache prevention
+      });
+      const data = await response.json();
+      
+      if (response.ok && data.success && Array.isArray(data.records)) {
+        console.log('📊 Fetched', data.records.length, 'attendance records from database');
+        console.log('📊 Records:', data.records.map(r => ({ 
+          id: r.employeeId, 
+          name: r.employeeName, 
+          checkIn: r.checkInTime 
+        })));
+        
+        // Update employee status based on database records
+        // This will update both realEmployees and employeeStatus
+        updateEmployeeStatusFromDatabase(data.records);
+        
+        // Update recent activity with new check-ins/check-outs
+        const newActivities = data.records
+          .filter(record => {
+            // Only show records from the last hour to avoid cluttering
+            const recordTime = new Date(record.checkInTime);
+            return Date.now() - recordTime.getTime() < 3600000; // 1 hour
+          })
+          .map(record => ({
+            id: `${record.employeeId}_${record.checkInTime}`,
+            type: record.checkOutTime ? 'check-out' : 'check-in',
+            employee: record.employeeName,
+            department: record.department,
+            time: new Date(record.checkOutTime || record.checkInTime),
+            status: 'success',
+            avatar: record.employeeName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+          }));
+        
+        if (newActivities.length > 0) {
+          setRecentActivity(prev => {
+            // Merge with existing activities, avoiding duplicates
+            const existingIds = new Set(prev.map(a => a.id));
+            const uniqueNew = newActivities.filter(a => !existingIds.has(a.id));
+            return [...uniqueNew, ...prev].slice(0, 15);
+          });
+        }
+      } else {
+        console.error('Failed to fetch attendance records:', data.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Error fetching attendance records:', error);
+    }
+  }, [updateEmployeeStatusFromDatabase]);
+
   // Helper function to check if an employee is an admin (case-insensitive)
   const isAdmin = (employee) => {
     if (!employee || !employee.role) return false;
     const role = employee.role.toLowerCase().trim();
     return role === 'admin' || role.includes('admin');
   };
-
-  // Real-time check for employee check-ins (optimized to prevent spam)
-  const checkForEmployeeCheckIns = useCallback(async () => {
-    // Prevent multiple simultaneous calls
-    if (isFetchingRef.current) {
-      console.log('⏸️ Already fetching, skipping...');
-      return;
-    }
-    
-    isFetchingRef.current = true;
-    try {
-      console.log('🔄 Polling for attendance updates...', timeFilter);
-      const timestamp = Date.now();
-      let records = [];
-      
-      // Determine date range based on timeFilter
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      if (timeFilter === 'today') {
-        // Fetch today's attendance records
-        const response = await fetch(`/api/attendance-records/today/all?_t=${timestamp}`, {
-          method: 'GET',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          },
-          cache: 'no-store'
-        });
-        const data = await response.json();
-        if (response.ok && data.success && Array.isArray(data.records)) {
-          records = data.records;
-        }
-      } else if (timeFilter === 'yesterday') {
-        // Fetch yesterday's attendance records
-        const yesterday = subDays(today, 1);
-        yesterday.setHours(0, 0, 0, 0);
-        const yesterdayStr = format(yesterday, 'yyyy-MM-dd');
-        console.log('📅 Fetching yesterday\'s attendance for:', yesterdayStr);
-        
-        // Get the month and year for yesterday (might be different month)
-        const yesterdayMonth = yesterday.getMonth() + 1;
-        const yesterdayYear = yesterday.getFullYear();
-        console.log('📅 Yesterday month/year:', yesterdayMonth, yesterdayYear);
-        
-        // Get all employees first
-        const nonAdminEmployees = realEmployees.filter(emp => !isAdmin(emp));
-        console.log('👥 Fetching attendance for', nonAdminEmployees.length, 'employees');
-        
-        // Fetch attendance for each employee in parallel
-        const attendancePromises = nonAdminEmployees.map(async (employee) => {
-          try {
-            // Fetch attendance for yesterday's month
-            const response = await fetch(`/api/attendance-records/employee/${employee.id}/${yesterdayMonth}/${yesterdayYear}`);
-            const empRecords = response.ok ? await response.json() : [];
-            
-            // Find record for yesterday - normalize dates for comparison
-            const yesterdayRecord = empRecords.find(r => {
-              if (!r.date) return false;
-              const recordDate = new Date(r.date);
-              recordDate.setHours(0, 0, 0, 0);
-              const recordDateStr = format(recordDate, 'yyyy-MM-dd');
-              return recordDateStr === yesterdayStr;
-            });
-            
-            if (yesterdayRecord) {
-              let hoursWorked = '0:00';
-              if (yesterdayRecord.outTime) {
-                const checkInTime = new Date(yesterdayRecord.inTime);
-                const checkOutTime = new Date(yesterdayRecord.outTime);
-                const diffMs = checkOutTime - checkInTime;
-                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                hoursWorked = `${diffHours}:${diffMinutes.toString().padStart(2, '0')}`;
-              }
-              
-              return {
-                employeeId: String(employee.id),
-                employeeName: employee.name,
-                department: employee.department,
-                email: employee.email,
-                checkInTime: yesterdayRecord.inTime,
-                checkOutTime: yesterdayRecord.outTime || null,
-                hoursWorked: hoursWorked,
-                status: yesterdayRecord.outTime ? 'completed' : 'active',
-                location: yesterdayRecord.location || 'Office'
-              };
-            }
-            return null;
-          } catch (error) {
-            console.error(`Error fetching attendance for employee ${employee.id}:`, error);
-            return null;
-          }
-        });
-        
-        const results = await Promise.all(attendancePromises);
-        records = results.filter(r => r !== null);
-        console.log('✅ Found', records.length, 'attendance records for yesterday');
-      } else if (timeFilter === 'week') {
-        // Fetch this week's attendance records
-        const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
-        weekStart.setHours(0, 0, 0, 0);
-        const weekEnd = endOfWeek(today, { weekStartsOn: 1 }); // Sunday
-        weekEnd.setHours(23, 59, 59, 999);
-        console.log('📅 Fetching this week\'s attendance from', format(weekStart, 'yyyy-MM-dd'), 'to', format(weekEnd, 'yyyy-MM-dd'));
-        
-        // Get all employees first
-        const nonAdminEmployees = realEmployees.filter(emp => !isAdmin(emp));
-        console.log('👥 Fetching attendance for', nonAdminEmployees.length, 'employees');
-        
-        // Fetch attendance for each employee in parallel
-        // We need to fetch data for both months if the week spans across months
-        const attendancePromises = nonAdminEmployees.map(async (employee) => {
-          try {
-            // Get months that the week spans
-            const monthsToFetch = new Set();
-            const currentDate = new Date(weekStart);
-            while (currentDate <= weekEnd) {
-              const month = currentDate.getMonth() + 1;
-              const year = currentDate.getFullYear();
-              monthsToFetch.add(`${year}-${month}`);
-              currentDate.setDate(currentDate.getDate() + 1);
-            }
-            
-            // Fetch records for all months in the week
-            const allRecords = [];
-            for (const monthKey of monthsToFetch) {
-              const [year, month] = monthKey.split('-').map(Number);
-              try {
-                const response = await fetch(`/api/attendance-records/employee/${employee.id}/${month}/${year}`);
-                const empRecords = response.ok ? await response.json() : [];
-                allRecords.push(...empRecords);
-              } catch (err) {
-                console.error(`Error fetching attendance for employee ${employee.id} for ${month}/${year}:`, err);
-              }
-            }
-            
-            // Find records within this week - normalize dates for comparison
-            const weekRecords = allRecords.filter(r => {
-              if (!r.date) return false;
-              const recordDate = new Date(r.date);
-              recordDate.setHours(0, 0, 0, 0);
-              return recordDate >= weekStart && recordDate <= weekEnd;
-            });
-            
-            // Get the most recent record for the week (or today's if available)
-            if (weekRecords.length > 0) {
-              // Sort by date descending to get the most recent
-              weekRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
-              const latestRecord = weekRecords[0];
-              
-              let hoursWorked = '0:00';
-              if (latestRecord.outTime) {
-                const checkInTime = new Date(latestRecord.inTime);
-                const checkOutTime = new Date(latestRecord.outTime);
-                const diffMs = checkOutTime - checkInTime;
-                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                hoursWorked = `${diffHours}:${diffMinutes.toString().padStart(2, '0')}`;
-              }
-              
-              return {
-                employeeId: String(employee.id),
-                employeeName: employee.name,
-                department: employee.department,
-                email: employee.email,
-                checkInTime: latestRecord.inTime,
-                checkOutTime: latestRecord.outTime || null,
-                hoursWorked: hoursWorked,
-                status: latestRecord.outTime ? 'completed' : 'active',
-                location: latestRecord.location || 'Office'
-              };
-            }
-            return null;
-          } catch (error) {
-            console.error(`Error fetching attendance for employee ${employee.id}:`, error);
-            return null;
-          }
-        });
-        
-        const results = await Promise.all(attendancePromises);
-        records = results.filter(r => r !== null);
-        console.log('✅ Found', records.length, 'attendance records for this week');
-      }
-      
-      if (records.length > 0) {
-        console.log('📊 Fetched', records.length, 'attendance records from database for', timeFilter);
-        
-        // Update employee status based on database records
-        updateEmployeeStatusFromDatabase(records);
-        
-        // Update recent activity with new check-ins/check-outs (only for today)
-        if (timeFilter === 'today') {
-          const newActivities = records
-            .filter(record => {
-              // Only show records from the last hour to avoid cluttering
-              const recordTime = new Date(record.checkInTime);
-              return Date.now() - recordTime.getTime() < 3600000; // 1 hour
-            })
-            .map(record => ({
-              id: `${record.employeeId}_${record.checkInTime}`,
-              type: record.checkOutTime ? 'check-out' : 'check-in',
-              employee: record.employeeName,
-              department: record.department,
-              time: new Date(record.checkOutTime || record.checkInTime),
-              status: 'success',
-              avatar: record.employeeName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-            }));
-          
-          if (newActivities.length > 0) {
-            setRecentActivity(prev => {
-              // Merge with existing activities, avoiding duplicates
-              const existingIds = new Set(prev.map(a => a.id));
-              const uniqueNew = newActivities.filter(a => !existingIds.has(a.id));
-              return [...uniqueNew, ...prev].slice(0, 15);
-            });
-          }
-        }
-      } else {
-        // If no records found, reset employee status
-        updateEmployeeStatusFromDatabase([]);
-      }
-    } catch (error) {
-      console.error('Error fetching attendance records:', error);
-    } finally {
-      isFetchingRef.current = false;
-    }
-  }, [updateEmployeeStatusFromDatabase, timeFilter, realEmployees]);
 
   // Load weekly attendance data for all employees (excluding admins)
   const loadWeeklyAttendanceData = useCallback(async () => {
@@ -790,43 +622,25 @@ const AdminDashboard = () => {
     }
   }, [realEmployees, weeklyAttendanceData, loadWeeklyAttendanceData]);
 
-  // Refresh attendance data when timeFilter changes
-  useEffect(() => {
-    if (realEmployees.length > 0) {
-      // Use a longer delay to avoid rapid re-renders and glitching
-      const timeoutId = setTimeout(() => {
-        if (!isFetchingRef.current) {
-          console.log('🔄 Refreshing attendance data for filter:', timeFilter);
-          checkForEmployeeCheckIns();
-        }
-      }, 500);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [timeFilter]); // Only depend on timeFilter to prevent loops
-
   useEffect(() => {
     // Set up real-time polling once on component mount
     console.log('🔄 Setting up real-time polling system...');
     
-    // Initial fetch immediately (only for today)
-    if (timeFilter === 'today') {
-      checkForEmployeeCheckIns();
-    }
+    // Initial fetch immediately
+    checkForEmployeeCheckIns();
     
     // Check for updates every 2 seconds for more responsive updates
-    // Only poll when filter is "today" to avoid conflicts with historical data
+    // Reduced from 3 seconds to ensure faster sync across devices
     const realTimeInterval = setInterval(() => {
-      if (timeFilter === 'today' && !isFetchingRef.current) {
-        console.log('⏰ Polling interval triggered - fetching attendance data...');
-        checkForEmployeeCheckIns();
-      }
+      console.log('⏰ Polling interval triggered - fetching attendance data...');
+      checkForEmployeeCheckIns();
     }, 2000);
     
     // Handle page visibility changes (important for mobile browsers)
     const handleVisibilityChange = () => {
-      if (!document.hidden && timeFilter === 'today' && !isFetchingRef.current) {
+      if (!document.hidden) {
         console.log('📱 Page became visible - refreshing attendance data');
-        // Immediately refresh when page becomes visible (only for today)
+        // Immediately refresh when page becomes visible
         checkForEmployeeCheckIns();
       }
     };
@@ -835,10 +649,8 @@ const AdminDashboard = () => {
     
     // Handle focus events (when user switches back to tab/window)
     const handleFocus = () => {
-      if (timeFilter === 'today' && !isFetchingRef.current) {
-        console.log('👁️ Window focused - refreshing attendance data');
-        checkForEmployeeCheckIns();
-      }
+      console.log('👁️ Window focused - refreshing attendance data');
+      checkForEmployeeCheckIns();
     };
     
     window.addEventListener('focus', handleFocus);
@@ -849,7 +661,7 @@ const AdminDashboard = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [timeFilter]); // Only depend on timeFilter to prevent re-creating interval
+  }, [checkForEmployeeCheckIns]); // Include checkForEmployeeCheckIns in dependencies
 
   useEffect(() => {
     if (realEmployees.length > 0) {
@@ -2102,8 +1914,8 @@ const AdminDashboard = () => {
               style={{ padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--border-color)', fontSize: '0.875rem' }}
             >
               <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
               <option value="week">This Week</option>
+              <option value="month">This Month</option>
             </select>
           </div>
         </div>
