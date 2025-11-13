@@ -8,7 +8,7 @@ import {
   Filter, Search, Plus, ArrowUpRight, ArrowDownRight, Eye, Edit, Trash2,
   MapPin, Phone, Mail, Star, Briefcase, UserPlus, GitBranch, PieChart, TrendingDown, Edit3, X, Save
 } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, isToday, isThisWeek, startOfWeek, endOfWeek } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, subDays, isToday, isThisWeek, startOfWeek, endOfWeek, isSameDay, startOfDay, endOfDay } from 'date-fns';
 
 
 // Add pulse animation styles
@@ -182,74 +182,199 @@ const AdminDashboard = () => {
     });
   }, []);
 
-  // Real-time check for employee check-ins (optimized to prevent spam)
-  const checkForEmployeeCheckIns = useCallback(async () => {
-    try {
-      console.log('🔄 Polling for attendance updates...');
-      // Fetch today's attendance records from database with cache-busting
-      const timestamp = Date.now();
-      const response = await fetch(`/api/attendance-records/today/all?_t=${timestamp}`, {
-        method: 'GET',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        },
-        cache: 'no-store' // Additional cache prevention
-      });
-      const data = await response.json();
-      
-      if (response.ok && data.success && Array.isArray(data.records)) {
-        console.log('📊 Fetched', data.records.length, 'attendance records from database');
-        console.log('📊 Records:', data.records.map(r => ({ 
-          id: r.employeeId, 
-          name: r.employeeName, 
-          checkIn: r.checkInTime 
-        })));
-        
-        // Update employee status based on database records
-        // This will update both realEmployees and employeeStatus
-        updateEmployeeStatusFromDatabase(data.records);
-        
-        // Update recent activity with new check-ins/check-outs
-        const newActivities = data.records
-          .filter(record => {
-            // Only show records from the last hour to avoid cluttering
-            const recordTime = new Date(record.checkInTime);
-            return Date.now() - recordTime.getTime() < 3600000; // 1 hour
-          })
-          .map(record => ({
-            id: `${record.employeeId}_${record.checkInTime}`,
-            type: record.checkOutTime ? 'check-out' : 'check-in',
-            employee: record.employeeName,
-            department: record.department,
-            time: new Date(record.checkOutTime || record.checkInTime),
-            status: 'success',
-            avatar: record.employeeName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-          }));
-        
-        if (newActivities.length > 0) {
-          setRecentActivity(prev => {
-            // Merge with existing activities, avoiding duplicates
-            const existingIds = new Set(prev.map(a => a.id));
-            const uniqueNew = newActivities.filter(a => !existingIds.has(a.id));
-            return [...uniqueNew, ...prev].slice(0, 15);
-          });
-        }
-      } else {
-        console.error('Failed to fetch attendance records:', data.error || 'Unknown error');
-      }
-    } catch (error) {
-      console.error('Error fetching attendance records:', error);
-    }
-  }, [updateEmployeeStatusFromDatabase]);
-
   // Helper function to check if an employee is an admin (case-insensitive)
   const isAdmin = (employee) => {
     if (!employee || !employee.role) return false;
     const role = employee.role.toLowerCase().trim();
     return role === 'admin' || role.includes('admin');
   };
+
+  // Real-time check for employee check-ins (optimized to prevent spam)
+  const checkForEmployeeCheckIns = useCallback(async () => {
+    try {
+      console.log('🔄 Polling for attendance updates...');
+      const timestamp = Date.now();
+      let records = [];
+      
+      // Determine date range based on timeFilter
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (timeFilter === 'today') {
+        // Fetch today's attendance records
+        const response = await fetch(`/api/attendance-records/today/all?_t=${timestamp}`, {
+          method: 'GET',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          },
+          cache: 'no-store'
+        });
+        const data = await response.json();
+        if (response.ok && data.success && Array.isArray(data.records)) {
+          records = data.records;
+        }
+      } else if (timeFilter === 'yesterday') {
+        // Fetch yesterday's attendance records
+        const yesterday = subDays(today, 1);
+        const yesterdayStr = format(yesterday, 'yyyy-MM-dd');
+        
+        // Fetch all employees and their attendance for current month, then filter
+        const month = today.getMonth() + 1;
+        const year = today.getFullYear();
+        
+        // Get all employees first
+        const nonAdminEmployees = realEmployees.filter(emp => !isAdmin(emp));
+        
+        // Fetch attendance for each employee in parallel
+        const attendancePromises = nonAdminEmployees.map(async (employee) => {
+          try {
+            const response = await fetch(`/api/attendance-records/employee/${employee.id}/${month}/${year}`);
+            const empRecords = response.ok ? await response.json() : [];
+            
+            // Find record for yesterday
+            const yesterdayRecord = empRecords.find(r => {
+              const recordDate = new Date(r.date);
+              return format(recordDate, 'yyyy-MM-dd') === yesterdayStr;
+            });
+            
+            if (yesterdayRecord) {
+              let hoursWorked = '0:00';
+              if (yesterdayRecord.outTime) {
+                const checkInTime = new Date(yesterdayRecord.inTime);
+                const checkOutTime = new Date(yesterdayRecord.outTime);
+                const diffMs = checkOutTime - checkInTime;
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                hoursWorked = `${diffHours}:${diffMinutes.toString().padStart(2, '0')}`;
+              }
+              
+              return {
+                employeeId: String(employee.id),
+                employeeName: employee.name,
+                department: employee.department,
+                email: employee.email,
+                checkInTime: yesterdayRecord.inTime,
+                checkOutTime: yesterdayRecord.outTime || null,
+                hoursWorked: hoursWorked,
+                status: yesterdayRecord.outTime ? 'completed' : 'active',
+                location: yesterdayRecord.location || 'Office'
+              };
+            }
+            return null;
+          } catch (error) {
+            console.error(`Error fetching attendance for employee ${employee.id}:`, error);
+            return null;
+          }
+        });
+        
+        const results = await Promise.all(attendancePromises);
+        records = results.filter(r => r !== null);
+      } else if (timeFilter === 'week') {
+        // Fetch this week's attendance records
+        const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
+        const weekEnd = endOfWeek(today, { weekStartsOn: 1 }); // Sunday
+        
+        // Fetch all employees and their attendance for current month, then filter
+        const month = today.getMonth() + 1;
+        const year = today.getFullYear();
+        
+        // Get all employees first
+        const nonAdminEmployees = realEmployees.filter(emp => !isAdmin(emp));
+        
+        // Fetch attendance for each employee in parallel
+        const attendancePromises = nonAdminEmployees.map(async (employee) => {
+          try {
+            const response = await fetch(`/api/attendance-records/employee/${employee.id}/${month}/${year}`);
+            const empRecords = response.ok ? await response.json() : [];
+            
+            // Find records within this week
+            const weekRecords = empRecords.filter(r => {
+              const recordDate = new Date(r.date);
+              return recordDate >= weekStart && recordDate <= weekEnd;
+            });
+            
+            // Get the most recent record for the week (or today's if available)
+            if (weekRecords.length > 0) {
+              // Sort by date descending to get the most recent
+              weekRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+              const latestRecord = weekRecords[0];
+              
+              let hoursWorked = '0:00';
+              if (latestRecord.outTime) {
+                const checkInTime = new Date(latestRecord.inTime);
+                const checkOutTime = new Date(latestRecord.outTime);
+                const diffMs = checkOutTime - checkInTime;
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                hoursWorked = `${diffHours}:${diffMinutes.toString().padStart(2, '0')}`;
+              }
+              
+              return {
+                employeeId: String(employee.id),
+                employeeName: employee.name,
+                department: employee.department,
+                email: employee.email,
+                checkInTime: latestRecord.inTime,
+                checkOutTime: latestRecord.outTime || null,
+                hoursWorked: hoursWorked,
+                status: latestRecord.outTime ? 'completed' : 'active',
+                location: latestRecord.location || 'Office'
+              };
+            }
+            return null;
+          } catch (error) {
+            console.error(`Error fetching attendance for employee ${employee.id}:`, error);
+            return null;
+          }
+        });
+        
+        const results = await Promise.all(attendancePromises);
+        records = results.filter(r => r !== null);
+      }
+      
+      if (records.length > 0) {
+        console.log('📊 Fetched', records.length, 'attendance records from database for', timeFilter);
+        
+        // Update employee status based on database records
+        updateEmployeeStatusFromDatabase(records);
+        
+        // Update recent activity with new check-ins/check-outs (only for today)
+        if (timeFilter === 'today') {
+          const newActivities = records
+            .filter(record => {
+              // Only show records from the last hour to avoid cluttering
+              const recordTime = new Date(record.checkInTime);
+              return Date.now() - recordTime.getTime() < 3600000; // 1 hour
+            })
+            .map(record => ({
+              id: `${record.employeeId}_${record.checkInTime}`,
+              type: record.checkOutTime ? 'check-out' : 'check-in',
+              employee: record.employeeName,
+              department: record.department,
+              time: new Date(record.checkOutTime || record.checkInTime),
+              status: 'success',
+              avatar: record.employeeName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+            }));
+          
+          if (newActivities.length > 0) {
+            setRecentActivity(prev => {
+              // Merge with existing activities, avoiding duplicates
+              const existingIds = new Set(prev.map(a => a.id));
+              const uniqueNew = newActivities.filter(a => !existingIds.has(a.id));
+              return [...uniqueNew, ...prev].slice(0, 15);
+            });
+          }
+        }
+      } else {
+        // If no records found, reset employee status
+        updateEmployeeStatusFromDatabase([]);
+      }
+    } catch (error) {
+      console.error('Error fetching attendance records:', error);
+    }
+  }, [updateEmployeeStatusFromDatabase, timeFilter, realEmployees, isAdmin]);
 
   // Load weekly attendance data for all employees (excluding admins)
   const loadWeeklyAttendanceData = useCallback(async () => {
@@ -621,6 +746,13 @@ const AdminDashboard = () => {
       }
     }
   }, [realEmployees, weeklyAttendanceData, loadWeeklyAttendanceData]);
+
+  // Refresh attendance data when timeFilter changes
+  useEffect(() => {
+    if (realEmployees.length > 0) {
+      checkForEmployeeCheckIns();
+    }
+  }, [timeFilter, checkForEmployeeCheckIns, realEmployees]);
 
   useEffect(() => {
     // Set up real-time polling once on component mount
@@ -1914,8 +2046,8 @@ const AdminDashboard = () => {
               style={{ padding: '0.5rem', borderRadius: '0.375rem', border: '1px solid var(--border-color)', fontSize: '0.875rem' }}
             >
               <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
               <option value="week">This Week</option>
-              <option value="month">This Month</option>
             </select>
           </div>
         </div>
