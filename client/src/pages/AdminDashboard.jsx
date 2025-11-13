@@ -218,25 +218,33 @@ const AdminDashboard = () => {
       } else if (timeFilter === 'yesterday') {
         // Fetch yesterday's attendance records
         const yesterday = subDays(today, 1);
+        yesterday.setHours(0, 0, 0, 0);
         const yesterdayStr = format(yesterday, 'yyyy-MM-dd');
+        console.log('📅 Fetching yesterday\'s attendance for:', yesterdayStr);
         
-        // Fetch all employees and their attendance for current month, then filter
-        const month = today.getMonth() + 1;
-        const year = today.getFullYear();
+        // Get the month and year for yesterday (might be different month)
+        const yesterdayMonth = yesterday.getMonth() + 1;
+        const yesterdayYear = yesterday.getFullYear();
+        console.log('📅 Yesterday month/year:', yesterdayMonth, yesterdayYear);
         
         // Get all employees first
         const nonAdminEmployees = realEmployees.filter(emp => !isAdmin(emp));
+        console.log('👥 Fetching attendance for', nonAdminEmployees.length, 'employees');
         
         // Fetch attendance for each employee in parallel
         const attendancePromises = nonAdminEmployees.map(async (employee) => {
           try {
-            const response = await fetch(`/api/attendance-records/employee/${employee.id}/${month}/${year}`);
+            // Fetch attendance for yesterday's month
+            const response = await fetch(`/api/attendance-records/employee/${employee.id}/${yesterdayMonth}/${yesterdayYear}`);
             const empRecords = response.ok ? await response.json() : [];
             
-            // Find record for yesterday
+            // Find record for yesterday - normalize dates for comparison
             const yesterdayRecord = empRecords.find(r => {
+              if (!r.date) return false;
               const recordDate = new Date(r.date);
-              return format(recordDate, 'yyyy-MM-dd') === yesterdayStr;
+              recordDate.setHours(0, 0, 0, 0);
+              const recordDateStr = format(recordDate, 'yyyy-MM-dd');
+              return recordDateStr === yesterdayStr;
             });
             
             if (yesterdayRecord) {
@@ -271,27 +279,51 @@ const AdminDashboard = () => {
         
         const results = await Promise.all(attendancePromises);
         records = results.filter(r => r !== null);
+        console.log('✅ Found', records.length, 'attendance records for yesterday');
       } else if (timeFilter === 'week') {
         // Fetch this week's attendance records
         const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
+        weekStart.setHours(0, 0, 0, 0);
         const weekEnd = endOfWeek(today, { weekStartsOn: 1 }); // Sunday
-        
-        // Fetch all employees and their attendance for current month, then filter
-        const month = today.getMonth() + 1;
-        const year = today.getFullYear();
+        weekEnd.setHours(23, 59, 59, 999);
+        console.log('📅 Fetching this week\'s attendance from', format(weekStart, 'yyyy-MM-dd'), 'to', format(weekEnd, 'yyyy-MM-dd'));
         
         // Get all employees first
         const nonAdminEmployees = realEmployees.filter(emp => !isAdmin(emp));
+        console.log('👥 Fetching attendance for', nonAdminEmployees.length, 'employees');
         
         // Fetch attendance for each employee in parallel
+        // We need to fetch data for both months if the week spans across months
         const attendancePromises = nonAdminEmployees.map(async (employee) => {
           try {
-            const response = await fetch(`/api/attendance-records/employee/${employee.id}/${month}/${year}`);
-            const empRecords = response.ok ? await response.json() : [];
+            // Get months that the week spans
+            const monthsToFetch = new Set();
+            const currentDate = new Date(weekStart);
+            while (currentDate <= weekEnd) {
+              const month = currentDate.getMonth() + 1;
+              const year = currentDate.getFullYear();
+              monthsToFetch.add(`${year}-${month}`);
+              currentDate.setDate(currentDate.getDate() + 1);
+            }
             
-            // Find records within this week
-            const weekRecords = empRecords.filter(r => {
+            // Fetch records for all months in the week
+            const allRecords = [];
+            for (const monthKey of monthsToFetch) {
+              const [year, month] = monthKey.split('-').map(Number);
+              try {
+                const response = await fetch(`/api/attendance-records/employee/${employee.id}/${month}/${year}`);
+                const empRecords = response.ok ? await response.json() : [];
+                allRecords.push(...empRecords);
+              } catch (err) {
+                console.error(`Error fetching attendance for employee ${employee.id} for ${month}/${year}:`, err);
+              }
+            }
+            
+            // Find records within this week - normalize dates for comparison
+            const weekRecords = allRecords.filter(r => {
+              if (!r.date) return false;
               const recordDate = new Date(r.date);
+              recordDate.setHours(0, 0, 0, 0);
               return recordDate >= weekStart && recordDate <= weekEnd;
             });
             
@@ -332,6 +364,7 @@ const AdminDashboard = () => {
         
         const results = await Promise.all(attendancePromises);
         records = results.filter(r => r !== null);
+        console.log('✅ Found', records.length, 'attendance records for this week');
       }
       
       if (records.length > 0) {
@@ -374,7 +407,7 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error fetching attendance records:', error);
     }
-  }, [updateEmployeeStatusFromDatabase, timeFilter, realEmployees, isAdmin]);
+  }, [updateEmployeeStatusFromDatabase, timeFilter, realEmployees]);
 
   // Load weekly attendance data for all employees (excluding admins)
   const loadWeeklyAttendanceData = useCallback(async () => {
@@ -750,9 +783,14 @@ const AdminDashboard = () => {
   // Refresh attendance data when timeFilter changes
   useEffect(() => {
     if (realEmployees.length > 0) {
-      checkForEmployeeCheckIns();
+      // Use a small delay to avoid rapid re-renders and glitching
+      const timeoutId = setTimeout(() => {
+        console.log('🔄 Refreshing attendance data for filter:', timeFilter);
+        checkForEmployeeCheckIns();
+      }, 200);
+      return () => clearTimeout(timeoutId);
     }
-  }, [timeFilter, checkForEmployeeCheckIns, realEmployees]);
+  }, [timeFilter, realEmployees.length]); // Depend on timeFilter and employee count
 
   useEffect(() => {
     // Set up real-time polling once on component mount
