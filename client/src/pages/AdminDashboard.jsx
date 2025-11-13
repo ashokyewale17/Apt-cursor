@@ -119,10 +119,13 @@ const AdminDashboard = () => {
           
           if (attendanceRecord.checkOutTime) {
             // Employee has checked out
+            const checkOutTime = new Date(attendanceRecord.checkOutTime);
+            const checkOutFormatted = format(checkOutTime, 'HH:mm');
             return {
               ...emp,
               status: 'completed',
               checkIn: checkInFormatted,
+              checkOut: checkOutFormatted,
               location: attendanceRecord.location || 'Office',
               hours: attendanceRecord.hoursWorked
             };
@@ -133,6 +136,7 @@ const AdminDashboard = () => {
               ...emp,
               status: 'active',
               checkIn: checkInFormatted,
+              checkOut: '-',
               location: attendanceRecord.location || 'Office',
               hours: '0:00'
             };
@@ -147,6 +151,7 @@ const AdminDashboard = () => {
             ...emp,
             status: newStatus,
             checkIn: emp.status === 'active' ? '-' : (emp.checkIn || '-'),
+            checkOut: emp.checkOut || '-',
             hours: emp.status === 'active' ? '0:00' : (emp.hours || '0:00')
           };
         }
@@ -747,6 +752,7 @@ const AdminDashboard = () => {
                   ...emp,
                   status: 'active',
                   checkIn: format(new Date(data.checkInTime), 'HH:mm'),
+                  checkOut: '-',
                   location: data.location || 'Office'
                 };
               } else if (data.checkOutTime) {
@@ -762,6 +768,7 @@ const AdminDashboard = () => {
                   ...emp,
                   status: 'completed',
                   checkIn: format(new Date(data.checkInTime), 'HH:mm'),
+                  checkOut: format(checkOutTime, 'HH:mm'),
                   location: data.location || 'Office',
                   hours: hoursWorked
                 };
@@ -873,6 +880,7 @@ const AdminDashboard = () => {
         role: 'Admin & HR',
         status: 'active',
         checkIn: '08:30',
+        checkOut: '-',
         hours: '8:00',
         location: 'Office',
         productivity: 98,
@@ -889,6 +897,7 @@ const AdminDashboard = () => {
         role: 'QA Engineer',
         status: 'active',
         checkIn: '09:00',
+        checkOut: '-',
         hours: '7:30',
         location: 'Office',
         productivity: 94,
@@ -904,6 +913,7 @@ const AdminDashboard = () => {
         role: 'Operations Manager',
         status: 'active',
         checkIn: '08:45',
+        checkOut: '-',
         hours: '8:15',
         location: 'Office',
         productivity: 96,
@@ -919,6 +929,7 @@ const AdminDashboard = () => {
         role: 'UI/UX Designer',
         status: 'active',
         checkIn: '09:15',
+        checkOut: '-',
         hours: '7:45',
         location: 'Remote',
         productivity: 92,
@@ -934,6 +945,7 @@ const AdminDashboard = () => {
         role: 'Software Developer',
         status: 'active',
         checkIn: '08:15',
+        checkOut: '-',
         hours: '8:30',
         location: 'Office',
         productivity: 95,
@@ -949,6 +961,7 @@ const AdminDashboard = () => {
         role: 'Senior Developer',
         status: 'absent',
         checkIn: '-',
+        checkOut: '-',
         hours: '0:00',
         location: 'Absent',
         productivity: 0,
@@ -964,6 +977,7 @@ const AdminDashboard = () => {
         role: 'Embedded Engineer',
         status: 'late',
         checkIn: '10:30',
+        checkOut: '-',
         hours: '6:30',
         location: 'Office',
         productivity: 85,
@@ -1978,15 +1992,31 @@ const AdminDashboard = () => {
                       </div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      {getStatusBadge(employee.status)}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                    {getStatusBadge(employee.status)}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: '80px' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Check-in
+                      </div>
                       <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
-                        {employee.hours}
+                        {employee.checkIn !== '-' ? employee.checkIn : '-'}
                       </div>
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      Check-in: {employee.checkIn !== '-' ? employee.checkIn : 'Not checked in'}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: '80px' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Check-out
+                      </div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
+                        {employee.checkOut && employee.checkOut !== '-' ? employee.checkOut : '-'}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: '80px' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Total Hours
+                      </div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
+                        {employee.hours || '0:00'}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -4388,4 +4418,5 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
   );
 }
 
+export default AdminDashboard;
 export default AdminDashboard;
