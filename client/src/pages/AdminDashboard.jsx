@@ -57,6 +57,7 @@ const AdminDashboard = () => {
   const [weeklyAttendanceData, setWeeklyAttendanceData] = useState(new Map()); // Map of employeeId -> weekly data
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const isFetchingRef = useRef(false); // Prevent multiple simultaneous fetches
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
@@ -191,8 +192,15 @@ const AdminDashboard = () => {
 
   // Real-time check for employee check-ins (optimized to prevent spam)
   const checkForEmployeeCheckIns = useCallback(async () => {
+    // Prevent multiple simultaneous calls
+    if (isFetchingRef.current) {
+      console.log('⏸️ Already fetching, skipping...');
+      return;
+    }
+    
+    isFetchingRef.current = true;
     try {
-      console.log('🔄 Polling for attendance updates...');
+      console.log('🔄 Polling for attendance updates...', timeFilter);
       const timestamp = Date.now();
       let records = [];
       
@@ -406,6 +414,8 @@ const AdminDashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching attendance records:', error);
+    } finally {
+      isFetchingRef.current = false;
     }
   }, [updateEmployeeStatusFromDatabase, timeFilter, realEmployees]);
 
@@ -783,34 +793,40 @@ const AdminDashboard = () => {
   // Refresh attendance data when timeFilter changes
   useEffect(() => {
     if (realEmployees.length > 0) {
-      // Use a small delay to avoid rapid re-renders and glitching
+      // Use a longer delay to avoid rapid re-renders and glitching
       const timeoutId = setTimeout(() => {
-        console.log('🔄 Refreshing attendance data for filter:', timeFilter);
-        checkForEmployeeCheckIns();
-      }, 200);
+        if (!isFetchingRef.current) {
+          console.log('🔄 Refreshing attendance data for filter:', timeFilter);
+          checkForEmployeeCheckIns();
+        }
+      }, 500);
       return () => clearTimeout(timeoutId);
     }
-  }, [timeFilter, realEmployees.length]); // Depend on timeFilter and employee count
+  }, [timeFilter]); // Only depend on timeFilter to prevent loops
 
   useEffect(() => {
     // Set up real-time polling once on component mount
     console.log('🔄 Setting up real-time polling system...');
     
-    // Initial fetch immediately
-    checkForEmployeeCheckIns();
+    // Initial fetch immediately (only for today)
+    if (timeFilter === 'today') {
+      checkForEmployeeCheckIns();
+    }
     
     // Check for updates every 2 seconds for more responsive updates
-    // Reduced from 3 seconds to ensure faster sync across devices
+    // Only poll when filter is "today" to avoid conflicts with historical data
     const realTimeInterval = setInterval(() => {
-      console.log('⏰ Polling interval triggered - fetching attendance data...');
-      checkForEmployeeCheckIns();
+      if (timeFilter === 'today' && !isFetchingRef.current) {
+        console.log('⏰ Polling interval triggered - fetching attendance data...');
+        checkForEmployeeCheckIns();
+      }
     }, 2000);
     
     // Handle page visibility changes (important for mobile browsers)
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
+      if (!document.hidden && timeFilter === 'today' && !isFetchingRef.current) {
         console.log('📱 Page became visible - refreshing attendance data');
-        // Immediately refresh when page becomes visible
+        // Immediately refresh when page becomes visible (only for today)
         checkForEmployeeCheckIns();
       }
     };
@@ -819,8 +835,10 @@ const AdminDashboard = () => {
     
     // Handle focus events (when user switches back to tab/window)
     const handleFocus = () => {
-      console.log('👁️ Window focused - refreshing attendance data');
-      checkForEmployeeCheckIns();
+      if (timeFilter === 'today' && !isFetchingRef.current) {
+        console.log('👁️ Window focused - refreshing attendance data');
+        checkForEmployeeCheckIns();
+      }
     };
     
     window.addEventListener('focus', handleFocus);
@@ -831,7 +849,7 @@ const AdminDashboard = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [checkForEmployeeCheckIns]); // Include checkForEmployeeCheckIns in dependencies
+  }, [timeFilter]); // Only depend on timeFilter to prevent re-creating interval
 
   useEffect(() => {
     if (realEmployees.length > 0) {
