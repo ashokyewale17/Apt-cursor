@@ -4094,7 +4094,12 @@ const AdminDashboard = () => {
 // Employee Card Component
 const EmployeeCard = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEditing, selectedEmployee, setSelectedEmployee, editData, setEditData }) => {
   const [isToggling, setIsToggling] = useState(false);
-  const [localEditData, setLocalEditData] = useState(editData || {
+  const isCurrentlyEditing = isEditing && selectedEmployee && selectedEmployee._id === employee._id;
+  const prevEmployeeIdRef = useRef(employee._id);
+  const prevIsEditingRef = useRef(isCurrentlyEditing);
+  
+  // Initialize localEditData with employee data
+  const getInitialEditData = () => ({
     ...employee,
     employeeId: employee.employeeId || '',
     birthDate: employee.birthDate || null,
@@ -4106,11 +4111,35 @@ const EmployeeCard = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEd
     bankAccountNumber: employee.bankAccountNumber || '',
     bankIFSC: employee.bankIFSC || ''
   });
+  
+  const [localEditData, setLocalEditData] = useState(getInitialEditData());
 
+  // Only update localEditData when:
+  // 1. Employee ID changes (different employee selected)
+  // 2. Edit mode changes from false to true (editing starts)
+  // 3. Edit mode changes from true to false (editing stops)
+  // We only depend on employee._id and isCurrentlyEditing to avoid resetting while typing
   useEffect(() => {
-    if (editData) {
-      setLocalEditData(editData);
-    } else {
+    const employeeChanged = prevEmployeeIdRef.current !== employee._id;
+    const editingStarted = !prevIsEditingRef.current && isCurrentlyEditing;
+    const editingStopped = prevIsEditingRef.current && !isCurrentlyEditing;
+    
+    if (employeeChanged || editingStarted) {
+      // Initialize with employee data when editing starts or employee changes
+      setLocalEditData({
+        ...employee,
+        employeeId: employee.employeeId || '',
+        birthDate: employee.birthDate || null,
+        companyEmail: employee.companyEmail || '',
+        dateOfJoining: employee.dateOfJoining || null,
+        aadharNumber: employee.aadharNumber || '',
+        panNumber: employee.panNumber || '',
+        bankName: employee.bankName || '',
+        bankAccountNumber: employee.bankAccountNumber || '',
+        bankIFSC: employee.bankIFSC || ''
+      });
+    } else if (editingStopped) {
+      // Sync with employee data when editing stops
       setLocalEditData({
         ...employee,
         employeeId: employee.employeeId || '',
@@ -4124,7 +4153,12 @@ const EmployeeCard = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEd
         bankIFSC: employee.bankIFSC || ''
       });
     }
-  }, [employee, editData]);
+    
+    // Update refs
+    prevEmployeeIdRef.current = employee._id;
+    prevIsEditingRef.current = isCurrentlyEditing;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employee._id, isCurrentlyEditing]); // Only depend on ID and editing state, not employee object
 
   const formatDate = (date) => {
     if (!date) return 'N/A';

@@ -110,19 +110,32 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(400).json({ message: 'Employee with this email already exists' });
     }
     
+    // Clean and validate phone number - remove any non-digit characters except leading +
+    let cleanPhone = phone;
+    if (phone) {
+      cleanPhone = phone.trim();
+      // Remove spaces, dashes, parentheses, etc. but keep + if at the start
+      if (cleanPhone.startsWith('+')) {
+        const digits = cleanPhone.slice(1).replace(/\D/g, '');
+        cleanPhone = digits.length > 0 ? '+' + digits : phone.trim(); // Keep original if no digits found
+      } else {
+        cleanPhone = cleanPhone.replace(/\D/g, '') || phone.trim(); // Keep original if no digits found
+      }
+    }
+    
     const employee = new Employee({
-      name,
-      email,
+      name: name?.trim(),
+      email: email?.trim().toLowerCase(),
       password: password || 'password123', // Default password
       role: role || 'employee',
-      position,
-      department,
-      salary,
-      phone,
-      address,
-      employeeId,
+      position: position?.trim(),
+      department: department?.trim(),
+      salary: salary !== undefined ? Number(salary) : 0,
+      phone: cleanPhone,
+      address: address?.trim(),
+      employeeId: employeeId?.trim() || undefined,
       birthDate: birthDate ? new Date(birthDate) : undefined,
-      companyEmail,
+      companyEmail: companyEmail?.trim() || undefined,
       dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : undefined,
       aadharNumber: aadharNumber && aadharNumber.trim() !== '' ? aadharNumber.trim() : undefined,
       panNumber: panNumber && panNumber.trim() !== '' ? panNumber.trim().toUpperCase() : undefined,
@@ -160,7 +173,13 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     console.error('Error creating employee:', error);
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({ message: 'Validation error', errors });
+      const errorMessage = errors.length > 0 ? errors.join(', ') : 'Validation failed';
+      return res.status(400).json({ message: errorMessage, errors });
+    }
+    if (error.code === 11000) {
+      // Duplicate key error
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({ message: `${field} already exists` });
     }
     res.status(500).json({ message: 'Server error', error: error.message });
   }

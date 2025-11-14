@@ -109,7 +109,11 @@ const AddEmployee = () => {
         }, 2000);
       } else {
         const errorData = await response.json();
-        setMessage(`❌ Failed to add employee: ${errorData.message || 'Unknown error'}`);
+        let errorMessage = errorData.message || 'Unknown error';
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorMessage += ': ' + errorData.errors.join(', ');
+        }
+        setMessage(`❌ Failed to add employee: ${errorMessage}`);
       }
     } catch (error) {
       console.error("Error:", error);

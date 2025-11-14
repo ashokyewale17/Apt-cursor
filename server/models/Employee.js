@@ -99,7 +99,10 @@ const employeeSchema = new mongoose.Schema({
     maxlength: [10, 'PAN number must be 10 characters'],
     validate: {
       validator: function(v) {
-        return !v || /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v);
+        // Allow empty string, null, or undefined
+        if (!v || v === '') return true;
+        // Validate format if value is provided
+        return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v);
       },
       message: 'Please provide a valid PAN number (format: ABCDE1234F)'
     }
@@ -121,7 +124,10 @@ const employeeSchema = new mongoose.Schema({
     maxlength: [11, 'IFSC code must be 11 characters'],
     validate: {
       validator: function(v) {
-        return !v || /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v);
+        // Allow empty string, null, or undefined
+        if (!v || v === '') return true;
+        // Validate format if value is provided
+        return /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v);
       },
       message: 'Please provide a valid IFSC code (format: ABCD0123456)'
     }
