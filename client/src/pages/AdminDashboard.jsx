@@ -1374,7 +1374,12 @@ const AdminDashboard = () => {
       employeeId: employee.employeeId || '',
       birthDate: employee.birthDate || null,
       companyEmail: employee.companyEmail || '',
-      dateOfJoining: employee.dateOfJoining || null
+      dateOfJoining: employee.dateOfJoining || null,
+      aadharNumber: employee.aadharNumber || '',
+      panNumber: employee.panNumber || '',
+      bankName: employee.bankName || '',
+      bankAccountNumber: employee.bankAccountNumber || '',
+      bankIFSC: employee.bankIFSC || ''
     });
   };
 
@@ -4059,7 +4064,12 @@ const EmployeeCard = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEd
     employeeId: employee.employeeId || '',
     birthDate: employee.birthDate || null,
     companyEmail: employee.companyEmail || '',
-    dateOfJoining: employee.dateOfJoining || null
+    dateOfJoining: employee.dateOfJoining || null,
+    aadharNumber: employee.aadharNumber || '',
+    panNumber: employee.panNumber || '',
+    bankName: employee.bankName || '',
+    bankAccountNumber: employee.bankAccountNumber || '',
+    bankIFSC: employee.bankIFSC || ''
   });
 
   useEffect(() => {
@@ -4071,7 +4081,12 @@ const EmployeeCard = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEd
         employeeId: employee.employeeId || '',
         birthDate: employee.birthDate || null,
         companyEmail: employee.companyEmail || '',
-        dateOfJoining: employee.dateOfJoining || null
+        dateOfJoining: employee.dateOfJoining || null,
+        aadharNumber: employee.aadharNumber || '',
+        panNumber: employee.panNumber || '',
+        bankName: employee.bankName || '',
+        bankAccountNumber: employee.bankAccountNumber || '',
+        bankIFSC: employee.bankIFSC || ''
       });
     }
   }, [employee, editData]);
@@ -4118,7 +4133,12 @@ const EmployeeCard = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEd
           employeeId: localEditData.employeeId || undefined,
           birthDate: localEditData.birthDate || undefined,
           companyEmail: localEditData.companyEmail || undefined,
-          dateOfJoining: localEditData.dateOfJoining || undefined
+          dateOfJoining: localEditData.dateOfJoining || undefined,
+          aadharNumber: localEditData.aadharNumber || undefined,
+          panNumber: localEditData.panNumber || undefined,
+          bankName: localEditData.bankName || undefined,
+          bankAccountNumber: localEditData.bankAccountNumber || undefined,
+          bankIFSC: localEditData.bankIFSC || undefined
         })
       });
 
@@ -4160,12 +4180,18 @@ const EmployeeCard = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEd
           <button 
             onClick={() => {
               setSelectedEmployee(null);
+              setEditData(null);
               setLocalEditData({
                 ...employee,
                 employeeId: employee.employeeId || '',
                 birthDate: employee.birthDate || null,
                 companyEmail: employee.companyEmail || '',
-                dateOfJoining: employee.dateOfJoining || null
+                dateOfJoining: employee.dateOfJoining || null,
+                aadharNumber: employee.aadharNumber || '',
+                panNumber: employee.panNumber || '',
+                bankName: employee.bankName || '',
+                bankAccountNumber: employee.bankAccountNumber || '',
+                bankIFSC: employee.bankIFSC || ''
               });
             }} 
             className="btn btn-sm btn-outline"
@@ -4311,16 +4337,128 @@ const EmployeeCard = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEd
           </div>
         </div>
 
+        {/* Personal Information Section */}
+        <div style={{ marginTop: '2rem', borderTop: '2px solid var(--border-color)', paddingTop: '1.5rem' }}>
+          <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)', fontSize: '1.125rem', fontWeight: '600' }}>
+            Personal Information
+          </h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+            {/* Aadhar Card Number */}
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                Aadhar Card Number
+              </label>
+              <input
+                type="text"
+                value={localEditData.aadharNumber || ''}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 12);
+                  setLocalEditData({ ...localEditData, aadharNumber: value });
+                }}
+                className="form-control"
+                maxLength={12}
+                style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                placeholder="1234 5678 9012"
+              />
+            </div>
+
+            {/* PAN Card Number */}
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                PAN Card Number
+              </label>
+              <input
+                type="text"
+                value={localEditData.panNumber || ''}
+                onChange={(e) => {
+                  const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+                  setLocalEditData({ ...localEditData, panNumber: value });
+                }}
+                className="form-control"
+                maxLength={10}
+                style={{ padding: '0.75rem', fontSize: '0.875rem', textTransform: 'uppercase' }}
+                placeholder="ABCDE1234F"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Bank Details Section */}
+        <div style={{ marginTop: '2rem', borderTop: '2px solid var(--border-color)', paddingTop: '1.5rem' }}>
+          <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)', fontSize: '1.125rem', fontWeight: '600' }}>
+            Bank Details
+          </h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+            {/* Bank Name */}
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                Bank Name
+              </label>
+              <input
+                type="text"
+                value={localEditData.bankName || ''}
+                onChange={(e) => setLocalEditData({ ...localEditData, bankName: e.target.value })}
+                className="form-control"
+                style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                placeholder="State Bank of India"
+              />
+            </div>
+
+            {/* Account Number */}
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                Account Number
+              </label>
+              <input
+                type="text"
+                value={localEditData.bankAccountNumber || ''}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '');
+                  setLocalEditData({ ...localEditData, bankAccountNumber: value });
+                }}
+                className="form-control"
+                style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                placeholder="1234567890"
+              />
+            </div>
+
+            {/* IFSC Code */}
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                IFSC Code
+              </label>
+              <input
+                type="text"
+                value={localEditData.bankIFSC || ''}
+                onChange={(e) => {
+                  const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+                  setLocalEditData({ ...localEditData, bankIFSC: value });
+                }}
+                className="form-control"
+                maxLength={11}
+                style={{ padding: '0.75rem', fontSize: '0.875rem', textTransform: 'uppercase' }}
+                placeholder="SBIN0001234"
+              />
+            </div>
+          </div>
+        </div>
+
         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
           <button 
             onClick={() => {
               setSelectedEmployee(null);
+              setEditData(null);
               setLocalEditData({
                 ...employee,
                 employeeId: employee.employeeId || '',
                 birthDate: employee.birthDate || null,
                 companyEmail: employee.companyEmail || '',
-                dateOfJoining: employee.dateOfJoining || null
+                dateOfJoining: employee.dateOfJoining || null,
+                aadharNumber: employee.aadharNumber || '',
+                panNumber: employee.panNumber || '',
+                bankName: employee.bankName || '',
+                bankAccountNumber: employee.bankAccountNumber || '',
+                bankIFSC: employee.bankIFSC || ''
               });
             }}
             className="btn btn-outline"
@@ -4507,6 +4645,80 @@ const EmployeeCard = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEd
           )}
         </div>
       </div>
+
+      {/* Personal Information */}
+      {(employee.aadharNumber || employee.panNumber) && (
+        <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'var(--background-alt)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Personal Information
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            {employee.aadharNumber && (
+              <div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                  Aadhar Number
+                </div>
+                <div style={{ fontSize: '0.875rem', fontWeight: '600', fontFamily: 'monospace', color: 'var(--text-primary)' }}>
+                  {employee.aadharNumber.replace(/(\d{4})(?=\d)/g, '$1 ')}
+                </div>
+              </div>
+            )}
+            {employee.panNumber && (
+              <div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                  PAN Number
+                </div>
+                <div style={{ fontSize: '0.875rem', fontWeight: '600', fontFamily: 'monospace', color: 'var(--text-primary)' }}>
+                  {employee.panNumber}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Bank Details */}
+      {(employee.bankName || employee.bankAccountNumber || employee.bankIFSC) && (
+        <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(99, 102, 241, 0.05))', borderRadius: '0.75rem', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--primary-color)', marginBottom: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Bank Details
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {employee.bankName && (
+              <div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                  Bank Name
+                </div>
+                <div style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+                  {employee.bankName}
+                </div>
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              {employee.bankAccountNumber && (
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                    Account Number
+                  </div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: '600', fontFamily: 'monospace', color: 'var(--text-primary)' }}>
+                    {employee.bankAccountNumber.replace(/(\d{4})(?=\d)/g, '$1 ')}
+                  </div>
+                </div>
+              )}
+              {employee.bankIFSC && (
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                    IFSC Code
+                  </div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: '600', fontFamily: 'monospace', color: 'var(--text-primary)' }}>
+                    {employee.bankIFSC}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: '0.75rem' }}>
