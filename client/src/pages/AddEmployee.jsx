@@ -17,7 +17,12 @@ const AddEmployee = () => {
     hireDate: "",
     address: "",
     birthDate: "",
-    companyEmail: ""
+    companyEmail: "",
+    aadharNumber: "",
+    panNumber: "",
+    bankAccountNumber: "",
+    bankIFSC: "",
+    bankName: ""
   });
 
   const [message, setMessage] = useState("");
@@ -67,7 +72,12 @@ const AddEmployee = () => {
           salary: 0, // Default salary value
           address: formData.address,
           birthDate: formData.birthDate || undefined,
-          companyEmail: formData.companyEmail || undefined
+          companyEmail: formData.companyEmail || undefined,
+          aadharNumber: formData.aadharNumber || undefined,
+          panNumber: formData.panNumber || undefined,
+          bankAccountNumber: formData.bankAccountNumber || undefined,
+          bankIFSC: formData.bankIFSC || undefined,
+          bankName: formData.bankName || undefined
         }),
       });
 
@@ -86,7 +96,12 @@ const AddEmployee = () => {
           hireDate: "",
           address: "",
           birthDate: "",
-          companyEmail: ""
+          companyEmail: "",
+          aadharNumber: "",
+          panNumber: "",
+          bankAccountNumber: "",
+          bankIFSC: "",
+          bankName: ""
         });
         // Navigate back to dashboard after 2 seconds
         setTimeout(() => {
@@ -324,6 +339,53 @@ const AddEmployee = () => {
                     placeholder="Enter address"
                   />
                 </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    Aadhar Card Number
+                  </label>
+                  <input
+                    type="text"
+                    name="aadharNumber"
+                    value={formData.aadharNumber}
+                    onChange={handleChange}
+                    maxLength={12}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      background: '#ffffff',
+                      color: '#1f2937'
+                    }}
+                    placeholder="1234 5678 9012"
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    PAN Card Number
+                  </label>
+                  <input
+                    type="text"
+                    name="panNumber"
+                    value={formData.panNumber}
+                    onChange={handleChange}
+                    maxLength={10}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      background: '#ffffff',
+                      color: '#1f2937',
+                      textTransform: 'uppercase'
+                    }}
+                    placeholder="ABCDE1234F"
+                  />
+                </div>
               </div>
 
               {/* Work Information */}
@@ -448,6 +510,81 @@ const AddEmployee = () => {
                       background: '#ffffff',
                       color: '#1f2937'
                     }}
+                  />
+                </div>
+              </div>
+
+              {/* Bank Details Section */}
+              <div>
+                <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)', borderBottom: '2px solid var(--primary-color)', paddingBottom: '0.5rem' }}>
+                  Bank Details
+                </h4>
+                
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    Bank Name
+                  </label>
+                  <input
+                    type="text"
+                    name="bankName"
+                    value={formData.bankName}
+                    onChange={handleChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      background: '#ffffff',
+                      color: '#1f2937'
+                    }}
+                    placeholder="State Bank of India"
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    Account Number
+                  </label>
+                  <input
+                    type="text"
+                    name="bankAccountNumber"
+                    value={formData.bankAccountNumber}
+                    onChange={handleChange}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      background: '#ffffff',
+                      color: '#1f2937'
+                    }}
+                    placeholder="1234567890"
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    IFSC Code
+                  </label>
+                  <input
+                    type="text"
+                    name="bankIFSC"
+                    value={formData.bankIFSC}
+                    onChange={handleChange}
+                    maxLength={11}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      background: '#ffffff',
+                      color: '#1f2937',
+                      textTransform: 'uppercase'
+                    }}
+                    placeholder="SBIN0001234"
                   />
                 </div>
               </div>

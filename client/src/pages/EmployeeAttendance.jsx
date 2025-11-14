@@ -129,7 +129,7 @@ const EmployeeAttendance = () => {
             notes = dbStatus === 'Leave' ? 'On Leave' : 'Holiday';
           } else if (dbStatus === 'Absent') {
             status = 'absent';
-            notes = 'Absent';
+            notes = '';
           } else if (record.inTime) {
             // Has check-in time
             checkIn = new Date(record.inTime);
@@ -151,15 +151,11 @@ const EmployeeAttendance = () => {
               totalHours = `${hours}h ${minutes}m`;
               
               status = 'completed';
-              if (isLate) {
-                notes = 'Late arrival';
-              }
+              notes = '';
             } else {
               // Checked in but not checked out yet - active day
               status = isToday ? 'active' : 'completed';
-              if (isLate) {
-                notes = 'Late arrival';
-              }
+              notes = '';
             }
           } else {
             // Present status but no inTime
@@ -213,7 +209,7 @@ const EmployeeAttendance = () => {
             checkOut: null,
             totalHours: '0h 0m',
             breaks: 0,
-            notes: 'Absent'
+            notes: ''
           };
         }
         

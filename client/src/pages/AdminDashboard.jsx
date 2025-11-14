@@ -297,19 +297,32 @@ const AdminDashboard = () => {
               if (dbStatus === 'Leave' || dbStatus === 'Holiday' || dbStatus === 'Absent') {
                 status = 'absent';
               } else if (record.inTime) {
-                // Determine if late (check-in after 9:30 AM)
-                const inTimeDate = new Date(record.inTime);
-                const lateThreshold = new Date(inTimeDate);
-                lateThreshold.setHours(9, 30, 0, 0);
-                const isLate = inTimeDate > lateThreshold;
+                // Determine status based on hours worked
+                let hoursWorked = 0;
                 
                 if (record.outTime) {
-                  // Completed day
-                  status = isLate ? 'late' : 'present';
+                  // Calculate hours worked
+                  const inTimeDate = new Date(record.inTime);
+                  const outTimeDate = new Date(record.outTime);
+                  hoursWorked = (outTimeDate - inTimeDate) / (1000 * 60 * 60);
+                  
+                  // Half day: less than 4 hours worked
+                  if (hoursWorked < 4) {
+                    status = 'half-day';
+                  } else {
+                    status = 'present';
+                  }
                 } else {
                   // Active day (checked in but not out)
                   if (isToday) {
-                    status = isLate ? 'late' : 'present';
+                    // For today without check-out, check if it's been less than 4 hours since check-in
+                    const inTimeDate = new Date(record.inTime);
+                    const now = new Date();
+                    hoursWorked = (now - inTimeDate) / (1000 * 60 * 60);
+                    
+                    // If less than 4 hours have passed, might still be half day
+                    // But since they haven't checked out, we can't be sure - default to present
+                    status = 'present';
                   } else {
                     status = 'present'; // Past day without check-out
                   }
@@ -327,9 +340,22 @@ const AdminDashboard = () => {
             // No record found
             // Check if it's today and employee is active
             if (isToday && (employee.status === 'active' || employee.status === 'completed')) {
+              // Check if employee worked less than 4 hours for half day
+              let status = 'present';
+              if (employee.hours) {
+                const hoursStr = employee.hours.split(':');
+                const hours = parseInt(hoursStr[0]) || 0;
+                const minutes = parseInt(hoursStr[1]) || 0;
+                const totalHours = hours + minutes / 60;
+                
+                if (totalHours > 0 && totalHours < 4) {
+                  status = 'half-day';
+                }
+              }
+              
               return {
                 date: format(date, 'EEE'),
-                status: employee.status === 'late' ? 'late' : 'present',
+                status: status,
                 fullDate: dateKey,
                 isToday: true
               };
@@ -595,7 +621,7 @@ const AdminDashboard = () => {
           weeklyAttendanceData.forEach((weeklyData) => {
             const dayData = weeklyData.find(d => d.fullDate === dateKey);
             if (dayData) {
-              if (dayData.status === 'present' || dayData.status === 'late') {
+              if (dayData.status === 'present' || dayData.status === 'half-day') {
                 present++;
               } else if (dayData.status === 'absent') {
                 absent++;
@@ -1791,22 +1817,68 @@ const AdminDashboard = () => {
 
       {/* Enhanced Stats Grid */}
       <div className="stats-grid" style={{ marginBottom: '2rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', width: '100%', maxWidth: '100%' }}>
-        <div className="stat-card" style={{ borderLeft: '4px solid var(--primary-color)', cursor: 'pointer' }} onClick={handleTotalEmployeesClick}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <div className="stat-value">{stats.totalEmployees}</div>
-              <div className="stat-label">
-                <Users size={16} style={{ display: 'inline', marginRight: '0.25rem' }} />
-                Total Employees
+        <div 
+          className="stat-card" 
+          style={{ 
+            borderLeft: '4px solid var(--primary-color)', 
+            cursor: 'pointer',
+            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(99, 102, 241, 0.05))',
+            transition: 'all 0.3s ease',
+            position: 'relative',
+            overflow: 'hidden'
+          }} 
+          onClick={handleTotalEmployeesClick}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
+            e.currentTarget.style.boxShadow = '0 12px 24px rgba(59, 130, 246, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+            e.currentTarget.style.boxShadow = '';
+          }}
+        >
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div className="stat-value" style={{ fontSize: '2.5rem', fontWeight: '700', background: 'linear-gradient(135deg, var(--primary-color), #6366f1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  {stats.totalEmployees}
+                </div>
+                <div className="stat-label" style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--text-primary)', marginTop: '0.5rem' }}>
+                  <Users size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
+                  Employee Management
+                </div>
+              </div>
+              <div style={{ 
+                padding: '1rem', 
+                background: 'linear-gradient(135deg, var(--primary-color), #6366f1)', 
+                borderRadius: '1rem',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+              }}>
+                <Users size={24} style={{ color: 'white' }} />
               </div>
             </div>
-            <div style={{ padding: '0.5rem', background: 'var(--primary-color)', borderRadius: '0.5rem' }}>
-              <Users size={20} style={{ color: 'white' }} />
+            <div style={{ 
+              fontSize: '0.875rem', 
+              color: 'var(--primary-color)', 
+              marginTop: '1rem',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <ArrowUpRight size={16} style={{ display: 'inline' }} /> 
+              Manage all employees
             </div>
           </div>
-          <div style={{ fontSize: '0.875rem', color: 'var(--success-color)', marginTop: '0.5rem' }}>
-            <ArrowUpRight size={14} style={{ display: 'inline' }} /> Click to manage employees
-          </div>
+          <div style={{
+            position: 'absolute',
+            top: '-50px',
+            right: '-50px',
+            width: '150px',
+            height: '150px',
+            background: 'rgba(59, 130, 246, 0.1)',
+            borderRadius: '50%'
+          }}></div>
         </div>
         
         <div className="stat-card" style={{ borderLeft: '4px solid var(--success-color)', cursor: 'pointer', transition: 'all 0.2s ease' }} 
@@ -2116,9 +2188,21 @@ const AdminDashboard = () => {
                   if (isToday) {
                     let status = 'absent';
                     if (employee.status === 'active' || employee.status === 'completed') {
-                      status = employee.status === 'late' ? 'late' : 'present';
-                    } else if (employee.status === 'late') {
-                      status = 'late';
+                      // Check if employee worked less than 4 hours for half day
+                      if (employee.hours) {
+                        const hoursStr = employee.hours.split(':');
+                        const hours = parseInt(hoursStr[0]) || 0;
+                        const minutes = parseInt(hoursStr[1]) || 0;
+                        const totalHours = hours + minutes / 60;
+                        
+                        if (totalHours > 0 && totalHours < 4) {
+                          status = 'half-day';
+                        } else {
+                          status = 'present';
+                        }
+                      } else {
+                        status = 'present';
+                      }
                     }
                     return {
                       date: format(date, 'EEE'),
@@ -2137,7 +2221,7 @@ const AdminDashboard = () => {
                 });
                 
                 const presentCount = weeklyData.filter(d => d.status === 'present').length;
-                const lateCount = weeklyData.filter(d => d.status === 'late').length;
+                const halfDayCount = weeklyData.filter(d => d.status === 'half-day').length;
                 const absentCount = weeklyData.filter(d => d.status === 'absent').length;
                 
                 // Highlight if employee is active today
@@ -2261,9 +2345,9 @@ const AdminDashboard = () => {
                           color: 'var(--warning-color)',
                           marginBottom: '0.25rem' 
                         }}>
-                          {lateCount}
+                          {halfDayCount}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Late</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Half Day</div>
                       </div>
                       <div style={{ 
                         textAlign: 'center', 
@@ -2300,17 +2384,17 @@ const AdminDashboard = () => {
                             fontWeight: '600',
                             background: 
                               day.status === 'present' ? 'rgba(16, 185, 129, 0.2)' :
-                              day.status === 'late' ? 'rgba(245, 158, 11, 0.2)' :
+                              day.status === 'half-day' ? 'rgba(245, 158, 11, 0.2)' :
                               day.status === 'absent' ? 'rgba(239, 68, 68, 0.2)' :
                               'rgba(156, 163, 175, 0.2)',
                             color: 
                               day.status === 'present' ? 'var(--success-color)' :
-                              day.status === 'late' ? 'var(--warning-color)' :
+                              day.status === 'half-day' ? 'var(--warning-color)' :
                               day.status === 'absent' ? 'var(--danger-color)' :
                               'var(--text-secondary)',
                             border: day.isToday ? '2px solid var(--primary-color)' : '1px solid ' + 
                               (day.status === 'present' ? 'var(--success-color)' :
-                              day.status === 'late' ? 'var(--warning-color)' :
+                              day.status === 'half-day' ? 'var(--warning-color)' :
                               day.status === 'absent' ? 'var(--danger-color)' :
                               'var(--border-color)'),
                             position: 'relative'
@@ -2319,7 +2403,7 @@ const AdminDashboard = () => {
                           <div style={{ fontSize: '0.625rem', marginBottom: '0.125rem' }}>{day.date}</div>
                           <div>
                             {day.status === 'present' ? '✓' : 
-                             day.status === 'late' ? '⏰' : 
+                             day.status === 'half-day' ? '½' : 
                              day.status === 'absent' ? '✗' : '—'}
                           </div>
                           {day.isToday && (
@@ -3980,7 +4064,12 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
     employeeId: employee.employeeId || '',
     birthDate: employee.birthDate || null,
     companyEmail: employee.companyEmail || '',
-    dateOfJoining: employee.dateOfJoining || null
+    dateOfJoining: employee.dateOfJoining || null,
+    aadharNumber: employee.aadharNumber || '',
+    panNumber: employee.panNumber || '',
+    bankAccountNumber: employee.bankAccountNumber || '',
+    bankIFSC: employee.bankIFSC || '',
+    bankName: employee.bankName || ''
   });
   const [isToggling, setIsToggling] = useState(false);
 
@@ -3991,7 +4080,12 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
       employeeId: employee.employeeId || '',
       birthDate: employee.birthDate || null,
       companyEmail: employee.companyEmail || '',
-      dateOfJoining: employee.dateOfJoining || null
+      dateOfJoining: employee.dateOfJoining || null,
+      aadharNumber: employee.aadharNumber || '',
+      panNumber: employee.panNumber || '',
+      bankAccountNumber: employee.bankAccountNumber || '',
+      bankIFSC: employee.bankIFSC || '',
+      bankName: employee.bankName || ''
     });
   }, [employee]);
 
@@ -4038,7 +4132,12 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
           employeeId: editData.employeeId,
           birthDate: editData.birthDate ? (typeof editData.birthDate === 'string' ? editData.birthDate : (editData.birthDate instanceof Date ? format(editData.birthDate, 'yyyy-MM-dd') : editData.birthDate)) : undefined,
           companyEmail: editData.companyEmail || undefined,
-          dateOfJoining: editData.dateOfJoining ? (typeof editData.dateOfJoining === 'string' ? editData.dateOfJoining : (editData.dateOfJoining instanceof Date ? format(editData.dateOfJoining, 'yyyy-MM-dd') : editData.dateOfJoining)) : undefined
+          dateOfJoining: editData.dateOfJoining ? (typeof editData.dateOfJoining === 'string' ? editData.dateOfJoining : (editData.dateOfJoining instanceof Date ? format(editData.dateOfJoining, 'yyyy-MM-dd') : editData.dateOfJoining)) : undefined,
+          aadharNumber: editData.aadharNumber || undefined,
+          panNumber: editData.panNumber || undefined,
+          bankAccountNumber: editData.bankAccountNumber || undefined,
+          bankIFSC: editData.bankIFSC || undefined,
+          bankName: editData.bankName || undefined
         })
       });
 
@@ -4078,7 +4177,12 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
                     employeeId: employee.employeeId || '',
                     birthDate: employee.birthDate || null,
                     companyEmail: employee.companyEmail || '',
-                    dateOfJoining: employee.dateOfJoining || null
+                    dateOfJoining: employee.dateOfJoining || null,
+                    aadharNumber: employee.aadharNumber || '',
+                    panNumber: employee.panNumber || '',
+                    bankAccountNumber: employee.bankAccountNumber || '',
+                    bankIFSC: employee.bankIFSC || '',
+                    bankName: employee.bankName || ''
                   });
                   onEdit(null);
                 }} 
@@ -4245,6 +4349,100 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
                   style={{ padding: '0.75rem', fontSize: '0.875rem', resize: 'vertical' }}
                   placeholder="Enter address"
                 />
+              </div>
+            </div>
+
+            {/* Personal Information Section */}
+            <div style={{ marginTop: '2rem', borderTop: '2px solid var(--border-color)', paddingTop: '1.5rem' }}>
+              <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)', fontSize: '1.125rem', fontWeight: '600' }}>
+                Personal Information
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                {/* Aadhar Card Number */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                    Aadhar Card Number
+                  </label>
+                  <input
+                    type="text"
+                    value={editData.aadharNumber || ''}
+                    onChange={(e) => setEditData({ ...editData, aadharNumber: e.target.value })}
+                    className="form-control"
+                    maxLength={12}
+                    style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                    placeholder="1234 5678 9012"
+                  />
+                </div>
+
+                {/* PAN Card Number */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                    PAN Card Number
+                  </label>
+                  <input
+                    type="text"
+                    value={editData.panNumber || ''}
+                    onChange={(e) => setEditData({ ...editData, panNumber: e.target.value.toUpperCase() })}
+                    className="form-control"
+                    maxLength={10}
+                    style={{ padding: '0.75rem', fontSize: '0.875rem', textTransform: 'uppercase' }}
+                    placeholder="ABCDE1234F"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Bank Details Section */}
+            <div style={{ marginTop: '2rem', borderTop: '2px solid var(--border-color)', paddingTop: '1.5rem' }}>
+              <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)', fontSize: '1.125rem', fontWeight: '600' }}>
+                Bank Details
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                {/* Bank Name */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                    Bank Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editData.bankName || ''}
+                    onChange={(e) => setEditData({ ...editData, bankName: e.target.value })}
+                    className="form-control"
+                    style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                    placeholder="State Bank of India"
+                  />
+                </div>
+
+                {/* Account Number */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                    Account Number
+                  </label>
+                  <input
+                    type="text"
+                    value={editData.bankAccountNumber || ''}
+                    onChange={(e) => setEditData({ ...editData, bankAccountNumber: e.target.value })}
+                    className="form-control"
+                    style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+                    placeholder="1234567890"
+                  />
+                </div>
+
+                {/* IFSC Code */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+                    IFSC Code
+                  </label>
+                  <input
+                    type="text"
+                    value={editData.bankIFSC || ''}
+                    onChange={(e) => setEditData({ ...editData, bankIFSC: e.target.value.toUpperCase() })}
+                    className="form-control"
+                    maxLength={11}
+                    style={{ padding: '0.75rem', fontSize: '0.875rem', textTransform: 'uppercase' }}
+                    placeholder="SBIN0001234"
+                  />
+                </div>
               </div>
             </div>
 
