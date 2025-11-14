@@ -129,7 +129,7 @@ const EmployeeAttendance = () => {
             notes = dbStatus === 'Leave' ? 'On Leave' : 'Holiday';
           } else if (dbStatus === 'Absent') {
             status = 'absent';
-            notes = '';
+            notes = ''; // Removed absent message
           } else if (record.inTime) {
             // Has check-in time
             checkIn = new Date(record.inTime);
@@ -151,16 +151,16 @@ const EmployeeAttendance = () => {
               totalHours = `${hours}h ${minutes}m`;
               
               status = 'completed';
-              notes = '';
+              // Removed late arrival message
             } else {
               // Checked in but not checked out yet - active day
               status = isToday ? 'active' : 'completed';
-              notes = '';
+              // Removed late arrival message
             }
           } else {
             // Present status but no inTime
             status = 'absent';
-            notes = 'No check-in recorded';
+            notes = ''; // Removed no check-in recorded message
           }
           
           return {
@@ -209,7 +209,7 @@ const EmployeeAttendance = () => {
             checkOut: null,
             totalHours: '0h 0m',
             breaks: 0,
-            notes: ''
+            notes: '' // Removed absent message
           };
         }
         

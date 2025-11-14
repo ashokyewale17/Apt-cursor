@@ -59,6 +59,7 @@ const AdminDashboard = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [editData, setEditData] = useState(null);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [monthlyAttendance, setMonthlyAttendance] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -1368,6 +1369,13 @@ const AdminDashboard = () => {
 
   const handleEmployeeEdit = (employee) => {
     setSelectedEmployee(employee);
+    setEditData({
+      ...employee,
+      employeeId: employee.employeeId || '',
+      birthDate: employee.birthDate || null,
+      companyEmail: employee.companyEmail || '',
+      dateOfJoining: employee.dateOfJoining || null
+    });
   };
 
   const handleEmployeeSave = async (updatedEmployee) => {
@@ -1380,6 +1388,7 @@ const AdminDashboard = () => {
     setRealEmployees(updatedEmployees);
     setEmployeeStatus(updatedEmployees);
     setSelectedEmployee(null);
+    setEditData(null);
     
     // Save to localStorage for login authentication
     try {
@@ -1817,68 +1826,22 @@ const AdminDashboard = () => {
 
       {/* Enhanced Stats Grid */}
       <div className="stats-grid" style={{ marginBottom: '2rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', width: '100%', maxWidth: '100%' }}>
-        <div 
-          className="stat-card" 
-          style={{ 
-            borderLeft: '4px solid var(--primary-color)', 
-            cursor: 'pointer',
-            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(99, 102, 241, 0.05))',
-            transition: 'all 0.3s ease',
-            position: 'relative',
-            overflow: 'hidden'
-          }} 
-          onClick={handleTotalEmployeesClick}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
-            e.currentTarget.style.boxShadow = '0 12px 24px rgba(59, 130, 246, 0.2)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0) scale(1)';
-            e.currentTarget.style.boxShadow = '';
-          }}
-        >
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div className="stat-value" style={{ fontSize: '2.5rem', fontWeight: '700', background: 'linear-gradient(135deg, var(--primary-color), #6366f1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                  {stats.totalEmployees}
-                </div>
-                <div className="stat-label" style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--text-primary)', marginTop: '0.5rem' }}>
-                  <Users size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                  Employee Management
-                </div>
-              </div>
-              <div style={{ 
-                padding: '1rem', 
-                background: 'linear-gradient(135deg, var(--primary-color), #6366f1)', 
-                borderRadius: '1rem',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-              }}>
-                <Users size={24} style={{ color: 'white' }} />
+        <div className="stat-card" style={{ borderLeft: '4px solid var(--primary-color)', cursor: 'pointer' }} onClick={handleTotalEmployeesClick}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div className="stat-value">{stats.totalEmployees}</div>
+              <div className="stat-label">
+                <Users size={16} style={{ display: 'inline', marginRight: '0.25rem' }} />
+                Total Employees
               </div>
             </div>
-            <div style={{ 
-              fontSize: '0.875rem', 
-              color: 'var(--primary-color)', 
-              marginTop: '1rem',
-              fontWeight: '500',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <ArrowUpRight size={16} style={{ display: 'inline' }} /> 
-              Manage all employees
+            <div style={{ padding: '0.5rem', background: 'var(--primary-color)', borderRadius: '0.5rem' }}>
+              <Users size={20} style={{ color: 'white' }} />
             </div>
           </div>
-          <div style={{
-            position: 'absolute',
-            top: '-50px',
-            right: '-50px',
-            width: '150px',
-            height: '150px',
-            background: 'rgba(59, 130, 246, 0.1)',
-            borderRadius: '50%'
-          }}></div>
+          <div style={{ fontSize: '0.875rem', color: 'var(--success-color)', marginTop: '0.5rem' }}>
+            <ArrowUpRight size={14} style={{ display: 'inline' }} /> Click to manage employees
+          </div>
         </div>
         
         <div className="stat-card" style={{ borderLeft: '4px solid var(--success-color)', cursor: 'pointer', transition: 'all 0.2s ease' }} 
@@ -3542,127 +3505,249 @@ const AdminDashboard = () => {
 
       {/* Employee Management Modal */}
       {showEmployeeModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            animation: 'fadeIn 0.3s ease'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowEmployeeModal(false);
+              setSelectedEmployee(null);
+              setEditData(null);
+            }
+          }}
+        >
           <div style={{
             backgroundColor: 'white',
-            borderRadius: '0.75rem',
-            padding: '2rem',
-            width: '90%',
-            maxWidth: '1000px',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            borderRadius: '1rem',
+            width: '95%',
+            maxWidth: '1400px',
+            maxHeight: '95vh',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3)',
+            display: 'flex',
+            flexDirection: 'column',
+            animation: 'slideUp 0.3s ease'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: '700', margin: 0 }}>Employee Management</h2>
-              <button 
-                onClick={() => setShowEmployeeModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)'
-                }}
-              >
-                ×
-              </button>
+            {/* Enhanced Header */}
+            <div style={{ 
+              padding: '2rem', 
+              borderBottom: '1px solid var(--border-color)',
+              background: 'linear-gradient(135deg, var(--primary-color), #6366f1)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '-50%',
+                right: '-10%',
+                width: '300px',
+                height: '300px',
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '50%'
+              }}></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+                <div>
+                  <h2 style={{ fontSize: '1.75rem', fontWeight: '700', margin: 0, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <Users size={28} />
+                    Employee Management
+                  </h2>
+                  <p style={{ margin: 0, opacity: 0.9, fontSize: '0.875rem' }}>
+                    Manage and view all employee information
+                  </p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setShowEmployeeModal(false);
+                    setSelectedEmployee(null);
+                    setEditData(null);
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    border: 'none',
+                    fontSize: '1.5rem',
+                    cursor: 'pointer',
+                    color: 'white',
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s ease',
+                    fontWeight: 'bold'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                    e.currentTarget.style.transform = 'rotate(90deg)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.transform = 'rotate(0deg)';
+                  }}
+                >
+                  ×
+                </button>
+              </div>
             </div>
             
-            {/* Search and Filter */}
-            <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <div style={{ position: 'relative', flex: 1 }}>
-                <Search size={20} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                <input
-                  type="text"
-                  placeholder="Search employees by name, email, or department..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+            {/* Enhanced Search and Filter Section */}
+            <div style={{ 
+              padding: '1.5rem 2rem', 
+              background: 'var(--background-alt)',
+              borderBottom: '1px solid var(--border-color)'
+            }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: '300px' }}>
+                  <Search size={20} style={{ 
+                    position: 'absolute', 
+                    left: '1rem', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)', 
+                    color: 'var(--text-secondary)',
+                    zIndex: 1
+                  }} />
+                  <input
+                    type="text"
+                    placeholder="Search employees by name, email, or department..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem 1rem 0.875rem 3rem',
+                      border: '2px solid var(--border-color)',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      transition: 'all 0.2s ease',
+                      background: 'white'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = 'var(--primary-color)';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'var(--border-color)';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
+                </div>
+                <select
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
                   style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem 0.75rem 3rem',
+                    padding: '0.875rem 1rem',
                     border: '2px solid var(--border-color)',
                     borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
+                    fontSize: '0.875rem',
+                    minWidth: '180px',
+                    background: 'white',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
                   }}
-                />
-              </div>
-              <select
-                value={departmentFilter}
-                onChange={(e) => setDepartmentFilter(e.target.value)}
-                style={{
-                  padding: '0.75rem 1rem',
-                  border: '2px solid var(--border-color)',
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'var(--primary-color)';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'var(--border-color)';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                >
+                  <option value="all">All Departments</option>
+                  <option value="Electronics">Electronics</option>
+                  <option value="Operations">Operations</option>
+                  <option value="Software">Software</option>
+                  <option value="Mechanical">Mechanical</option>
+                </select>
+                <div style={{
+                  padding: '0.875rem 1.25rem',
+                  background: 'linear-gradient(135deg, var(--primary-color), #6366f1)',
+                  color: 'white',
                   borderRadius: '0.5rem',
                   fontSize: '0.875rem',
-                  minWidth: '150px'
-                }}
-              >
-                <option value="all">All Departments</option>
-                <option value="Electronics">Electronics</option>
-                <option value="Operations">Operations</option>
-                <option value="Software">Software</option>
-                <option value="Mechanical">Mechanical</option>
-              </select>
+                  fontWeight: '600',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {realEmployees.filter(emp => {
+                    const matchesSearch = !searchTerm || 
+                      emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      emp.department?.toLowerCase().includes(searchTerm.toLowerCase());
+                    const matchesDepartment = departmentFilter === 'all' || emp.department === departmentFilter;
+                    return matchesSearch && matchesDepartment;
+                  }).length} Employees
+                </div>
+              </div>
             </div>
             
-            {/* Employee List */}
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1200px' }}>
-                <thead>
-                  <tr style={{ backgroundColor: 'var(--background-alt)' }}>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Employee</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Employee ID</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Contact</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Position</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Department</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Join Date</th>
-                    <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Status</th>
-                    <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', borderBottom: '2px solid var(--border-color)' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {realEmployees.length === 0 ? (
-                    <tr>
-                      <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                        No employees found
-                      </td>
-                    </tr>
-                  ) : (
-                    realEmployees
-                      .filter(emp => {
-                        const matchesSearch = !searchTerm || 
-                          emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          emp.department?.toLowerCase().includes(searchTerm.toLowerCase());
-                        const matchesDepartment = departmentFilter === 'all' || emp.department === departmentFilter;
-                        return matchesSearch && matchesDepartment;
-                      })
-                      .map((employee) => (
-                        <EmployeeRow 
-                          key={employee.id || employee._id} 
-                          employee={employee} 
-                          onEdit={handleEmployeeEdit}
-                          onDelete={handleEmployeeDelete}
-                          onSave={handleEmployeeSave}
-                          onStatusToggle={handleEmployeeStatusToggle}
-                          isEditing={selectedEmployee?.id === employee.id || selectedEmployee?._id === employee._id}
-                        />
-                      ))
-                  )}
-                </tbody>
-              </table>
+            {/* Enhanced Employee List */}
+            <div style={{ 
+              flex: 1, 
+              overflow: 'auto', 
+              padding: '1.5rem 2rem',
+              background: 'linear-gradient(to bottom, #f8fafc, white)'
+            }}>
+              {realEmployees.length === 0 ? (
+                <div style={{ 
+                  padding: '4rem 2rem', 
+                  textAlign: 'center', 
+                  color: 'var(--text-secondary)',
+                  background: 'white',
+                  borderRadius: '0.75rem',
+                  border: '2px dashed var(--border-color)'
+                }}>
+                  <Users size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
+                  <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    No employees found
+                  </div>
+                  <div style={{ fontSize: '0.875rem' }}>
+                    Try adjusting your search or filter criteria
+                  </div>
+                </div>
+              ) : (
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
+                  gap: '1.5rem' 
+                }}>
+                  {realEmployees
+                    .filter(emp => {
+                      const matchesSearch = !searchTerm || 
+                        emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        emp.department?.toLowerCase().includes(searchTerm.toLowerCase());
+                      const matchesDepartment = departmentFilter === 'all' || emp.department === departmentFilter;
+                      return matchesSearch && matchesDepartment;
+                    })
+                    .map((employee) => (
+                      <EmployeeCard
+                        key={employee.id || employee._id}
+                        employee={employee}
+                        onEdit={handleEmployeeEdit}
+                        onDelete={handleEmployeeDelete}
+                        onSave={handleEmployeeSave}
+                        onStatusToggle={handleEmployeeStatusToggle}
+                        isEditing={selectedEmployee?.id === employee.id || selectedEmployee?._id === employee._id}
+                        selectedEmployee={selectedEmployee}
+                        setSelectedEmployee={setSelectedEmployee}
+                        editData={editData}
+                        setEditData={setEditData}
+                      />
+                    ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -3966,6 +4051,540 @@ const AdminDashboard = () => {
   );
 };
 
+// Employee Card Component
+const EmployeeCard = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEditing, selectedEmployee, setSelectedEmployee, editData, setEditData }) => {
+  const [isToggling, setIsToggling] = useState(false);
+  const [localEditData, setLocalEditData] = useState(editData || {
+    ...employee,
+    employeeId: employee.employeeId || '',
+    birthDate: employee.birthDate || null,
+    companyEmail: employee.companyEmail || '',
+    dateOfJoining: employee.dateOfJoining || null
+  });
+
+  useEffect(() => {
+    if (editData) {
+      setLocalEditData(editData);
+    } else {
+      setLocalEditData({
+        ...employee,
+        employeeId: employee.employeeId || '',
+        birthDate: employee.birthDate || null,
+        companyEmail: employee.companyEmail || '',
+        dateOfJoining: employee.dateOfJoining || null
+      });
+    }
+  }, [employee, editData]);
+
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    try {
+      const d = new Date(date);
+      return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  const handleStatusToggle = async () => {
+    if (window.confirm(`Are you sure you want to ${employee.isActive ? 'deactivate' : 'activate'} ${employee.name}?`)) {
+      setIsToggling(true);
+      try {
+        await onStatusToggle(employee);
+      } finally {
+        setIsToggling(false);
+      }
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const employeeId = employee._id || employee.id;
+      
+      const response = await fetch(`/api/employees/${employeeId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: localEditData.name,
+          email: localEditData.email,
+          phone: localEditData.phone,
+          address: localEditData.address,
+          department: localEditData.department,
+          position: localEditData.position,
+          employeeId: localEditData.employeeId || undefined,
+          birthDate: localEditData.birthDate || undefined,
+          companyEmail: localEditData.companyEmail || undefined,
+          dateOfJoining: localEditData.dateOfJoining || undefined
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update employee');
+      }
+
+      const updatedEmployee = await response.json();
+      onSave({
+        ...employee,
+        ...updatedEmployee,
+        id: updatedEmployee._id || updatedEmployee.id,
+        _id: updatedEmployee._id || updatedEmployee.id
+      });
+      setSelectedEmployee(null);
+    } catch (error) {
+      console.error('Error updating employee:', error);
+      alert(error.message || 'Failed to update employee. Please try again.');
+    }
+  };
+
+  const isActive = employee.isActive !== false;
+
+  if (isEditing) {
+    return (
+      <div style={{
+        gridColumn: '1 / -1',
+        background: 'white',
+        borderRadius: '1rem',
+        padding: '2rem',
+        border: '2px solid var(--primary-color)',
+        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600', color: 'var(--primary-color)' }}>
+            Editing: {employee.name}
+          </h3>
+          <button 
+            onClick={() => {
+              setSelectedEmployee(null);
+              setLocalEditData({
+                ...employee,
+                employeeId: employee.employeeId || '',
+                birthDate: employee.birthDate || null,
+                companyEmail: employee.companyEmail || '',
+                dateOfJoining: employee.dateOfJoining || null
+              });
+            }} 
+            className="btn btn-sm btn-outline"
+            style={{ padding: '0.5rem 1rem' }}
+          >
+            Cancel
+          </button>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+              Employee Name *
+            </label>
+            <input
+              type="text"
+              value={localEditData.name || ''}
+              onChange={(e) => setLocalEditData({ ...localEditData, name: e.target.value })}
+              className="form-control"
+              required
+              style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+              Employee ID
+            </label>
+            <input
+              type="text"
+              value={localEditData.employeeId || ''}
+              onChange={(e) => setLocalEditData({ ...localEditData, employeeId: e.target.value })}
+              className="form-control"
+              style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+              placeholder="EMP001"
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+              Contact Number *
+            </label>
+            <input
+              type="tel"
+              value={localEditData.phone || ''}
+              onChange={(e) => setLocalEditData({ ...localEditData, phone: e.target.value })}
+              className="form-control"
+              required
+              style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+              Email Address *
+            </label>
+            <input
+              type="email"
+              value={localEditData.email || ''}
+              onChange={(e) => setLocalEditData({ ...localEditData, email: e.target.value })}
+              className="form-control"
+              required
+              style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+              Company Mail ID
+            </label>
+            <input
+              type="email"
+              value={localEditData.companyEmail || ''}
+              onChange={(e) => setLocalEditData({ ...localEditData, companyEmail: e.target.value })}
+              className="form-control"
+              style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+              Birth Date
+            </label>
+            <input
+              type="date"
+              value={localEditData.birthDate ? (typeof localEditData.birthDate === 'string' ? localEditData.birthDate.split('T')[0] : format(new Date(localEditData.birthDate), 'yyyy-MM-dd')) : ''}
+              onChange={(e) => setLocalEditData({ ...localEditData, birthDate: e.target.value || null })}
+              className="form-control"
+              style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+              Joining Date *
+            </label>
+            <input
+              type="date"
+              value={localEditData.dateOfJoining ? (typeof localEditData.dateOfJoining === 'string' ? localEditData.dateOfJoining.split('T')[0] : format(new Date(localEditData.dateOfJoining), 'yyyy-MM-dd')) : ''}
+              onChange={(e) => setLocalEditData({ ...localEditData, dateOfJoining: e.target.value || null })}
+              className="form-control"
+              required
+              style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+              Department *
+            </label>
+            <select
+              value={localEditData.department || ''}
+              onChange={(e) => setLocalEditData({ ...localEditData, department: e.target.value })}
+              className="form-control form-select"
+              required
+              style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+            >
+              <option value="">Select Department</option>
+              <option value="Electronics">Electronics</option>
+              <option value="Operations">Operations</option>
+              <option value="Software">Software</option>
+              <option value="Mechanical">Mechanical</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+              Position *
+            </label>
+            <input
+              type="text"
+              value={localEditData.position || ''}
+              onChange={(e) => setLocalEditData({ ...localEditData, position: e.target.value })}
+              className="form-control"
+              required
+              style={{ padding: '0.75rem', fontSize: '0.875rem' }}
+            />
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
+              Address *
+            </label>
+            <textarea
+              value={localEditData.address || ''}
+              onChange={(e) => setLocalEditData({ ...localEditData, address: e.target.value })}
+              className="form-control"
+              required
+              rows={3}
+              style={{ padding: '0.75rem', fontSize: '0.875rem', resize: 'vertical' }}
+            />
+          </div>
+        </div>
+
+        <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+          <button 
+            onClick={() => {
+              setSelectedEmployee(null);
+              setLocalEditData({
+                ...employee,
+                employeeId: employee.employeeId || '',
+                birthDate: employee.birthDate || null,
+                companyEmail: employee.companyEmail || '',
+                dateOfJoining: employee.dateOfJoining || null
+              });
+            }}
+            className="btn btn-outline"
+            style={{ padding: '0.75rem 1.5rem' }}
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={handleSave}
+            className="btn btn-primary"
+            style={{ padding: '0.75rem 1.5rem' }}
+          >
+            <Save size={16} style={{ marginRight: '0.5rem' }} />
+            Save Changes
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      background: 'white',
+      borderRadius: '1rem',
+      padding: '1.5rem',
+      border: `2px solid ${isActive ? 'var(--border-color)' : '#fecaca'}`,
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+      transition: 'all 0.3s ease',
+      opacity: isActive ? 1 : 0.8,
+      position: 'relative',
+      overflow: 'hidden'
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.transform = 'translateY(-4px)';
+      e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.15)';
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.transform = 'translateY(0)';
+      e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+    }}
+    >
+      {!isActive && (
+        <div style={{
+          position: 'absolute',
+          top: '1rem',
+          right: '1rem',
+          background: '#ef4444',
+          color: 'white',
+          padding: '0.25rem 0.75rem',
+          borderRadius: '1rem',
+          fontSize: '0.75rem',
+          fontWeight: '600'
+        }}>
+          Inactive
+        </div>
+      )}
+      
+      {/* Employee Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem' }}>
+        <div style={{
+          width: '60px',
+          height: '60px',
+          borderRadius: '50%',
+          background: isActive ? 'linear-gradient(135deg, var(--primary-color), #6366f1)' : 'linear-gradient(135deg, #6b7280, #4b5563)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          fontWeight: 'bold',
+          fontSize: '1.25rem',
+          flexShrink: 0,
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+        }}>
+          {employee.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'E'}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ 
+            fontWeight: '700', 
+            fontSize: '1.125rem', 
+            marginBottom: '0.25rem',
+            color: 'var(--text-primary)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            {employee.name || 'N/A'}
+          </div>
+          <div style={{ 
+            fontSize: '0.875rem', 
+            color: 'var(--text-secondary)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            {employee.email || 'N/A'}
+          </div>
+          {employee.companyEmail && (
+            <div style={{ 
+              fontSize: '0.75rem', 
+              color: 'var(--text-secondary)', 
+              marginTop: '0.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}>
+              <Mail size={12} />
+              {employee.companyEmail}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Employee Details */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: '1fr 1fr', 
+        gap: '1rem', 
+        marginBottom: '1.25rem',
+        padding: '1rem',
+        background: 'var(--background-alt)',
+        borderRadius: '0.75rem'
+      }}>
+        <div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+            Employee ID
+          </div>
+          <div style={{ fontSize: '0.875rem', fontWeight: '600', fontFamily: 'monospace', color: 'var(--primary-color)' }}>
+            {employee.employeeId || 'N/A'}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+            Department
+          </div>
+          <div style={{
+            padding: '0.25rem 0.75rem',
+            backgroundColor: 'var(--primary-color)',
+            color: 'white',
+            borderRadius: '0.5rem',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            display: 'inline-block'
+          }}>
+            {employee.department || 'N/A'}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+            Position
+          </div>
+          <div style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)' }}>
+            {employee.position || 'N/A'}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+            Join Date
+          </div>
+          <div style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)' }}>
+            {formatDate(employee.dateOfJoining)}
+          </div>
+        </div>
+      </div>
+
+      {/* Contact Info */}
+      <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'var(--background-alt)', borderRadius: '0.75rem' }}>
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: '600' }}>
+          Contact Information
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
+            <Phone size={14} style={{ color: 'var(--text-secondary)' }} />
+            <span>{employee.phone || 'N/A'}</span>
+          </div>
+          {employee.address && (
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', wordBreak: 'break-word' }}>
+              {employee.address}
+            </div>
+          )}
+          {employee.birthDate && (
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              DOB: {formatDate(employee.birthDate)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <button
+          onClick={handleStatusToggle}
+          disabled={isToggling}
+          style={{
+            flex: 1,
+            padding: '0.75rem',
+            border: 'none',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            cursor: isToggling ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s ease',
+            backgroundColor: isActive ? '#10b981' : '#6b7280',
+            color: 'white',
+            opacity: isToggling ? 0.6 : 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem'
+          }}
+          onMouseEnter={(e) => {
+            if (!isToggling) {
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          {isToggling ? (
+            <>
+              <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
+              {isActive ? 'Deactivating...' : 'Activating...'}
+            </>
+          ) : (
+            <>
+              {isActive ? '✓ Active' : '○ Inactive'}
+            </>
+          )}
+        </button>
+        <button
+          onClick={() => {
+            onEdit(employee);
+          }}
+          style={{
+            padding: '0.75rem 1rem',
+            border: '2px solid var(--primary-color)',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            backgroundColor: 'transparent',
+            color: 'var(--primary-color)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--primary-color)';
+            e.currentTarget.style.color = 'white';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = 'var(--primary-color)';
+          }}
+        >
+          <Edit size={14} />
+          Edit
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // Employee Form Component
 const EmployeeForm = ({ employee = {}, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -4064,12 +4683,7 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
     employeeId: employee.employeeId || '',
     birthDate: employee.birthDate || null,
     companyEmail: employee.companyEmail || '',
-    dateOfJoining: employee.dateOfJoining || null,
-    aadharNumber: employee.aadharNumber || '',
-    panNumber: employee.panNumber || '',
-    bankAccountNumber: employee.bankAccountNumber || '',
-    bankIFSC: employee.bankIFSC || '',
-    bankName: employee.bankName || ''
+    dateOfJoining: employee.dateOfJoining || null
   });
   const [isToggling, setIsToggling] = useState(false);
 
@@ -4080,12 +4694,7 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
       employeeId: employee.employeeId || '',
       birthDate: employee.birthDate || null,
       companyEmail: employee.companyEmail || '',
-      dateOfJoining: employee.dateOfJoining || null,
-      aadharNumber: employee.aadharNumber || '',
-      panNumber: employee.panNumber || '',
-      bankAccountNumber: employee.bankAccountNumber || '',
-      bankIFSC: employee.bankIFSC || '',
-      bankName: employee.bankName || ''
+      dateOfJoining: employee.dateOfJoining || null
     });
   }, [employee]);
 
@@ -4132,12 +4741,7 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
           employeeId: editData.employeeId,
           birthDate: editData.birthDate ? (typeof editData.birthDate === 'string' ? editData.birthDate : (editData.birthDate instanceof Date ? format(editData.birthDate, 'yyyy-MM-dd') : editData.birthDate)) : undefined,
           companyEmail: editData.companyEmail || undefined,
-          dateOfJoining: editData.dateOfJoining ? (typeof editData.dateOfJoining === 'string' ? editData.dateOfJoining : (editData.dateOfJoining instanceof Date ? format(editData.dateOfJoining, 'yyyy-MM-dd') : editData.dateOfJoining)) : undefined,
-          aadharNumber: editData.aadharNumber || undefined,
-          panNumber: editData.panNumber || undefined,
-          bankAccountNumber: editData.bankAccountNumber || undefined,
-          bankIFSC: editData.bankIFSC || undefined,
-          bankName: editData.bankName || undefined
+          dateOfJoining: editData.dateOfJoining ? (typeof editData.dateOfJoining === 'string' ? editData.dateOfJoining : (editData.dateOfJoining instanceof Date ? format(editData.dateOfJoining, 'yyyy-MM-dd') : editData.dateOfJoining)) : undefined
         })
       });
 
@@ -4177,12 +4781,7 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
                     employeeId: employee.employeeId || '',
                     birthDate: employee.birthDate || null,
                     companyEmail: employee.companyEmail || '',
-                    dateOfJoining: employee.dateOfJoining || null,
-                    aadharNumber: employee.aadharNumber || '',
-                    panNumber: employee.panNumber || '',
-                    bankAccountNumber: employee.bankAccountNumber || '',
-                    bankIFSC: employee.bankIFSC || '',
-                    bankName: employee.bankName || ''
+                    dateOfJoining: employee.dateOfJoining || null
                   });
                   onEdit(null);
                 }} 
@@ -4349,100 +4948,6 @@ const EmployeeRow = ({ employee, onEdit, onDelete, onSave, onStatusToggle, isEdi
                   style={{ padding: '0.75rem', fontSize: '0.875rem', resize: 'vertical' }}
                   placeholder="Enter address"
                 />
-              </div>
-            </div>
-
-            {/* Personal Information Section */}
-            <div style={{ marginTop: '2rem', borderTop: '2px solid var(--border-color)', paddingTop: '1.5rem' }}>
-              <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)', fontSize: '1.125rem', fontWeight: '600' }}>
-                Personal Information
-              </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                {/* Aadhar Card Number */}
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
-                    Aadhar Card Number
-                  </label>
-                  <input
-                    type="text"
-                    value={editData.aadharNumber || ''}
-                    onChange={(e) => setEditData({ ...editData, aadharNumber: e.target.value })}
-                    className="form-control"
-                    maxLength={12}
-                    style={{ padding: '0.75rem', fontSize: '0.875rem' }}
-                    placeholder="1234 5678 9012"
-                  />
-                </div>
-
-                {/* PAN Card Number */}
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
-                    PAN Card Number
-                  </label>
-                  <input
-                    type="text"
-                    value={editData.panNumber || ''}
-                    onChange={(e) => setEditData({ ...editData, panNumber: e.target.value.toUpperCase() })}
-                    className="form-control"
-                    maxLength={10}
-                    style={{ padding: '0.75rem', fontSize: '0.875rem', textTransform: 'uppercase' }}
-                    placeholder="ABCDE1234F"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Bank Details Section */}
-            <div style={{ marginTop: '2rem', borderTop: '2px solid var(--border-color)', paddingTop: '1.5rem' }}>
-              <h4 style={{ marginBottom: '1rem', color: 'var(--primary-color)', fontSize: '1.125rem', fontWeight: '600' }}>
-                Bank Details
-              </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                {/* Bank Name */}
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
-                    Bank Name
-                  </label>
-                  <input
-                    type="text"
-                    value={editData.bankName || ''}
-                    onChange={(e) => setEditData({ ...editData, bankName: e.target.value })}
-                    className="form-control"
-                    style={{ padding: '0.75rem', fontSize: '0.875rem' }}
-                    placeholder="State Bank of India"
-                  />
-                </div>
-
-                {/* Account Number */}
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
-                    Account Number
-                  </label>
-                  <input
-                    type="text"
-                    value={editData.bankAccountNumber || ''}
-                    onChange={(e) => setEditData({ ...editData, bankAccountNumber: e.target.value })}
-                    className="form-control"
-                    style={{ padding: '0.75rem', fontSize: '0.875rem' }}
-                    placeholder="1234567890"
-                  />
-                </div>
-
-                {/* IFSC Code */}
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
-                    IFSC Code
-                  </label>
-                  <input
-                    type="text"
-                    value={editData.bankIFSC || ''}
-                    onChange={(e) => setEditData({ ...editData, bankIFSC: e.target.value.toUpperCase() })}
-                    className="form-control"
-                    maxLength={11}
-                    style={{ padding: '0.75rem', fontSize: '0.875rem', textTransform: 'uppercase' }}
-                    placeholder="SBIN0001234"
-                  />
-                </div>
               </div>
             </div>
 
