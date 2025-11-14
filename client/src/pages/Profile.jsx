@@ -63,6 +63,11 @@ const Profile = () => {
           employeeId: userData.employeeId || '',
           birthDate: userData.birthDate || null,
           companyEmail: userData.companyEmail || '',
+          aadharNumber: userData.aadharNumber || '',
+          panNumber: userData.panNumber || '',
+          bankName: userData.bankName || '',
+          bankAccountNumber: userData.bankAccountNumber || '',
+          bankIFSC: userData.bankIFSC || '',
           _id: userData._id
         });
         
@@ -78,6 +83,11 @@ const Profile = () => {
           employeeId: userData.employeeId || '',
           birthDate: userData.birthDate || null,
           companyEmail: userData.companyEmail || '',
+          aadharNumber: userData.aadharNumber || '',
+          panNumber: userData.panNumber || '',
+          bankName: userData.bankName || '',
+          bankAccountNumber: userData.bankAccountNumber || '',
+          bankIFSC: userData.bankIFSC || '',
           _id: userData._id
         });
       } catch (err) {
@@ -128,7 +138,12 @@ const Profile = () => {
           employeeId: tempProfileData.employeeId,
           birthDate: tempProfileData.birthDate ? format(new Date(tempProfileData.birthDate), 'yyyy-MM-dd') : undefined,
           companyEmail: tempProfileData.companyEmail,
-          dateOfJoining: tempProfileData.dateOfJoining ? format(new Date(tempProfileData.dateOfJoining), 'yyyy-MM-dd') : undefined
+          dateOfJoining: tempProfileData.dateOfJoining ? format(new Date(tempProfileData.dateOfJoining), 'yyyy-MM-dd') : undefined,
+          aadharNumber: tempProfileData.aadharNumber || undefined,
+          panNumber: tempProfileData.panNumber || undefined,
+          bankName: tempProfileData.bankName || undefined,
+          bankAccountNumber: tempProfileData.bankAccountNumber || undefined,
+          bankIFSC: tempProfileData.bankIFSC || undefined
         })
       });
 
@@ -149,7 +164,12 @@ const Profile = () => {
         employeeId: updatedEmployee.employeeId,
         birthDate: updatedEmployee.birthDate,
         companyEmail: updatedEmployee.companyEmail,
-        dateOfJoining: updatedEmployee.dateOfJoining
+        dateOfJoining: updatedEmployee.dateOfJoining,
+        aadharNumber: updatedEmployee.aadharNumber,
+        panNumber: updatedEmployee.panNumber,
+        bankName: updatedEmployee.bankName,
+        bankAccountNumber: updatedEmployee.bankAccountNumber,
+        bankIFSC: updatedEmployee.bankIFSC
       });
       
       // Update auth context
@@ -162,7 +182,12 @@ const Profile = () => {
         employeeId: updatedEmployee.employeeId,
         birthDate: updatedEmployee.birthDate,
         companyEmail: updatedEmployee.companyEmail,
-        dateOfJoining: updatedEmployee.dateOfJoining
+        dateOfJoining: updatedEmployee.dateOfJoining,
+        aadharNumber: updatedEmployee.aadharNumber,
+        panNumber: updatedEmployee.panNumber,
+        bankName: updatedEmployee.bankName,
+        bankAccountNumber: updatedEmployee.bankAccountNumber,
+        bankIFSC: updatedEmployee.bankIFSC
       });
       
       setIsEditing(false);
@@ -877,6 +902,95 @@ const Profile = () => {
                 )}
               </div>
 
+              {/* Aadhar Card Number */}
+              <div style={{
+                padding: '1.5rem',
+                background: 'var(--background-alt)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)'
+              }}>
+                <label className="form-label" style={{ 
+                  fontWeight: '600',
+                  marginBottom: '0.75rem',
+                  color: 'var(--text-primary)'
+                }}>Aadhar Card Number</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={tempProfileData.aadharNumber || ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 12);
+                      handleInputChange('aadharNumber', value);
+                    }}
+                    maxLength={12}
+                    style={{
+                      padding: '0.875rem',
+                      fontSize: '1rem',
+                      border: '2px solid var(--border-color)',
+                      borderRadius: '8px',
+                      fontFamily: 'monospace'
+                    }}
+                    placeholder="1234 5678 9012"
+                  />
+                ) : (
+                  <p style={{ 
+                    margin: 0, 
+                    fontWeight: '600', 
+                    fontSize: '1.1rem',
+                    fontFamily: 'monospace',
+                    color: 'var(--text-primary)'
+                  }}>
+                    {profileData.aadharNumber ? profileData.aadharNumber.replace(/(\d{4})(?=\d)/g, '$1 ') : 'N/A'}
+                  </p>
+                )}
+              </div>
+
+              {/* PAN Card Number */}
+              <div style={{
+                padding: '1.5rem',
+                background: 'var(--background-alt)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)'
+              }}>
+                <label className="form-label" style={{ 
+                  fontWeight: '600',
+                  marginBottom: '0.75rem',
+                  color: 'var(--text-primary)'
+                }}>PAN Card Number</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={tempProfileData.panNumber || ''}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+                      handleInputChange('panNumber', value);
+                    }}
+                    maxLength={10}
+                    style={{
+                      padding: '0.875rem',
+                      fontSize: '1rem',
+                      border: '2px solid var(--border-color)',
+                      borderRadius: '8px',
+                      fontFamily: 'monospace',
+                      textTransform: 'uppercase'
+                    }}
+                    placeholder="ABCDE1234F"
+                  />
+                ) : (
+                  <p style={{ 
+                    margin: 0, 
+                    fontWeight: '600', 
+                    fontSize: '1.1rem',
+                    fontFamily: 'monospace',
+                    color: 'var(--text-primary)'
+                  }}>
+                    {profileData.panNumber || 'N/A'}
+                  </p>
+                )}
+              </div>
+
               <div style={{
                 padding: '1.5rem',
                 background: 'var(--background-alt)',
@@ -995,6 +1109,166 @@ const Profile = () => {
                   }} />
                   Active
                 </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bank Details */}
+        <div className="card" style={{
+          border: '1px solid var(--border-color)',
+          borderRadius: '16px',
+          overflow: 'hidden',
+          transition: 'all 0.3s ease'
+        }}>
+          <div className="card-header" style={{
+            background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
+            borderBottom: '1px solid var(--border-color)'
+          }}>
+            <h3 className="card-title" style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.75rem',
+              fontSize: '1.25rem',
+              fontWeight: '600'
+            }}>
+              <div style={{
+                padding: '0.5rem',
+                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                borderRadius: '8px',
+                color: 'white'
+              }}>
+                <FileText size={20} />
+              </div>
+              Bank Details
+            </h3>
+          </div>
+          <div className="card-body" style={{ padding: '2rem' }}>
+            <div style={{ display: 'grid', gap: '2rem' }}>
+              {/* Bank Name */}
+              <div style={{
+                padding: '1.5rem',
+                background: 'var(--background-alt)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)'
+              }}>
+                <label className="form-label" style={{ 
+                  fontWeight: '600',
+                  marginBottom: '0.75rem',
+                  color: 'var(--text-primary)'
+                }}>Bank Name</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={tempProfileData.bankName || ''}
+                    onChange={(e) => handleInputChange('bankName', e.target.value)}
+                    style={{
+                      padding: '0.875rem',
+                      fontSize: '1rem',
+                      border: '2px solid var(--border-color)',
+                      borderRadius: '8px'
+                    }}
+                    placeholder="State Bank of India"
+                  />
+                ) : (
+                  <p style={{ 
+                    margin: 0, 
+                    fontWeight: '500', 
+                    fontSize: '1.1rem',
+                    color: 'var(--text-primary)'
+                  }}>
+                    {profileData.bankName || 'N/A'}
+                  </p>
+                )}
+              </div>
+
+              {/* Account Number */}
+              <div style={{
+                padding: '1.5rem',
+                background: 'var(--background-alt)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)'
+              }}>
+                <label className="form-label" style={{ 
+                  fontWeight: '600',
+                  marginBottom: '0.75rem',
+                  color: 'var(--text-primary)'
+                }}>Account Number</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={tempProfileData.bankAccountNumber || ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '');
+                      handleInputChange('bankAccountNumber', value);
+                    }}
+                    style={{
+                      padding: '0.875rem',
+                      fontSize: '1rem',
+                      border: '2px solid var(--border-color)',
+                      borderRadius: '8px',
+                      fontFamily: 'monospace'
+                    }}
+                    placeholder="1234567890"
+                  />
+                ) : (
+                  <p style={{ 
+                    margin: 0, 
+                    fontWeight: '600', 
+                    fontSize: '1.1rem',
+                    fontFamily: 'monospace',
+                    color: 'var(--text-primary)'
+                  }}>
+                    {profileData.bankAccountNumber ? profileData.bankAccountNumber.replace(/(\d{4})(?=\d)/g, '$1 ') : 'N/A'}
+                  </p>
+                )}
+              </div>
+
+              {/* IFSC Code */}
+              <div style={{
+                padding: '1.5rem',
+                background: 'var(--background-alt)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)'
+              }}>
+                <label className="form-label" style={{ 
+                  fontWeight: '600',
+                  marginBottom: '0.75rem',
+                  color: 'var(--text-primary)'
+                }}>IFSC Code</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={tempProfileData.bankIFSC || ''}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+                      handleInputChange('bankIFSC', value);
+                    }}
+                    maxLength={11}
+                    style={{
+                      padding: '0.875rem',
+                      fontSize: '1rem',
+                      border: '2px solid var(--border-color)',
+                      borderRadius: '8px',
+                      fontFamily: 'monospace',
+                      textTransform: 'uppercase'
+                    }}
+                    placeholder="SBIN0001234"
+                  />
+                ) : (
+                  <p style={{ 
+                    margin: 0, 
+                    fontWeight: '600', 
+                    fontSize: '1.1rem',
+                    fontFamily: 'monospace',
+                    color: 'var(--text-primary)'
+                  }}>
+                    {profileData.bankIFSC || 'N/A'}
+                  </p>
+                )}
               </div>
             </div>
           </div>

@@ -423,6 +423,11 @@ const AdminDashboard = () => {
             employeeId: e.employeeId,
             birthDate: e.birthDate,
             companyEmail: e.companyEmail,
+            aadharNumber: e.aadharNumber,
+            panNumber: e.panNumber,
+            bankName: e.bankName,
+            bankAccountNumber: e.bankAccountNumber,
+            bankIFSC: e.bankIFSC,
             isActive: e.isActive,
             status: e.isActive ? 'active' : 'inactive'
           }));
@@ -578,6 +583,14 @@ const AdminDashboard = () => {
               role: e.role,
               salary: e.salary,
               dateOfJoining: e.dateOfJoining,
+              employeeId: e.employeeId,
+              birthDate: e.birthDate,
+              companyEmail: e.companyEmail,
+              aadharNumber: e.aadharNumber,
+              panNumber: e.panNumber,
+              bankName: e.bankName,
+              bankAccountNumber: e.bankAccountNumber,
+              bankIFSC: e.bankIFSC,
               isActive: e.isActive,
               status: e.isActive ? 'active' : 'inactive'
             }));
@@ -1516,6 +1529,14 @@ const AdminDashboard = () => {
           role: e.role,
           salary: e.salary,
           dateOfJoining: e.dateOfJoining,
+          employeeId: e.employeeId,
+          birthDate: e.birthDate,
+          companyEmail: e.companyEmail,
+          aadharNumber: e.aadharNumber,
+          panNumber: e.panNumber,
+          bankName: e.bankName,
+          bankAccountNumber: e.bankAccountNumber,
+          bankIFSC: e.bankIFSC,
           isActive: e.isActive,
           status: e.isActive ? 'active' : 'inactive'
         }));
@@ -1562,13 +1583,27 @@ const AdminDashboard = () => {
             const data = await resp.json();
             if (resp.ok && Array.isArray(data.employees)) {
               const normalized = data.employees.map(e => ({
+                _id: e._id,
                 id: e._id,
                 name: e.name,
                 email: e.email,
+                phone: e.phone,
+                address: e.address,
                 department: e.department,
-                role: e.position,
-                status: e.isActive ? 'active' : 'inactive',
-                phone: e.phone
+                position: e.position,
+                role: e.role || e.position,
+                salary: e.salary,
+                dateOfJoining: e.dateOfJoining,
+                employeeId: e.employeeId,
+                birthDate: e.birthDate,
+                companyEmail: e.companyEmail,
+                aadharNumber: e.aadharNumber,
+                panNumber: e.panNumber,
+                bankName: e.bankName,
+                bankAccountNumber: e.bankAccountNumber,
+                bankIFSC: e.bankIFSC,
+                isActive: e.isActive,
+                status: e.isActive ? 'active' : 'inactive'
               }));
               setRealEmployees(normalized);
               setEmployeeStatus(normalized);

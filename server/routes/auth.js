@@ -192,7 +192,15 @@ router.get('/me', async (req, res) => {
       salary: user.salary,
       phone: user.phone,
       address: user.address,
+      employeeId: user.employeeId,
+      birthDate: user.birthDate,
+      companyEmail: user.companyEmail,
       dateOfJoining: user.dateOfJoining,
+      aadharNumber: user.aadharNumber,
+      panNumber: user.panNumber,
+      bankName: user.bankName,
+      bankAccountNumber: user.bankAccountNumber,
+      bankIFSC: user.bankIFSC,
       lastLogin: user.lastLogin
     };
 

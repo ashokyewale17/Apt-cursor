@@ -98,7 +98,11 @@ router.get('/:id', authenticateToken, requireAdminOrSelf, async (req, res) => {
 // @access  Private (Admin)
 router.post('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { name, email, password, role, position, department, salary, phone, address, employeeId, birthDate, companyEmail, dateOfJoining } = req.body;
+    const { 
+      name, email, password, role, position, department, salary, phone, address, 
+      employeeId, birthDate, companyEmail, dateOfJoining,
+      aadharNumber, panNumber, bankName, bankAccountNumber, bankIFSC
+    } = req.body;
     
     // Check if employee with email already exists
     const existingEmployee = await Employee.findOne({ email, isActive: true });
@@ -119,7 +123,12 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
       employeeId,
       birthDate: birthDate ? new Date(birthDate) : undefined,
       companyEmail,
-      dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : undefined
+      dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : undefined,
+      aadharNumber: aadharNumber && aadharNumber.trim() !== '' ? aadharNumber.trim() : undefined,
+      panNumber: panNumber && panNumber.trim() !== '' ? panNumber.trim().toUpperCase() : undefined,
+      bankName: bankName && bankName.trim() !== '' ? bankName.trim() : undefined,
+      bankAccountNumber: bankAccountNumber && bankAccountNumber.trim() !== '' ? bankAccountNumber.trim() : undefined,
+      bankIFSC: bankIFSC && bankIFSC.trim() !== '' ? bankIFSC.trim().toUpperCase() : undefined
     });
     
     await employee.save();
@@ -162,7 +171,11 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
 // @access  Private
 router.put('/:id', authenticateToken, requireAdminOrSelf, async (req, res) => {
   try {
-    const { name, email, position, department, salary, phone, address, role, isActive, employeeId, birthDate, companyEmail, dateOfJoining } = req.body;
+    const { 
+      name, email, position, department, salary, phone, address, role, isActive, 
+      employeeId, birthDate, companyEmail, dateOfJoining,
+      aadharNumber, panNumber, bankName, bankAccountNumber, bankIFSC
+    } = req.body;
     
     // Check if another employee with the same email exists
     if (email) {
@@ -196,7 +209,12 @@ router.put('/:id', authenticateToken, requireAdminOrSelf, async (req, res) => {
       ...(employeeId !== undefined && { employeeId }),
       ...(birthDate && { birthDate: new Date(birthDate) }),
       ...(companyEmail !== undefined && { companyEmail }),
-      ...(dateOfJoining && { dateOfJoining: new Date(dateOfJoining) })
+      ...(dateOfJoining && { dateOfJoining: new Date(dateOfJoining) }),
+      ...(aadharNumber !== undefined && { aadharNumber: aadharNumber && aadharNumber.trim() !== '' ? aadharNumber.trim() : null }),
+      ...(panNumber !== undefined && { panNumber: panNumber && panNumber.trim() !== '' ? panNumber.trim().toUpperCase() : null }),
+      ...(bankName !== undefined && { bankName: bankName && bankName.trim() !== '' ? bankName.trim() : null }),
+      ...(bankAccountNumber !== undefined && { bankAccountNumber: bankAccountNumber && bankAccountNumber.trim() !== '' ? bankAccountNumber.trim() : null }),
+      ...(bankIFSC !== undefined && { bankIFSC: bankIFSC && bankIFSC.trim() !== '' ? bankIFSC.trim().toUpperCase() : null })
     };
     
     // Only admin can change roles and status

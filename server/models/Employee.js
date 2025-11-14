@@ -87,6 +87,45 @@ const employeeSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  aadharNumber: {
+    type: String,
+    trim: true,
+    maxlength: [12, 'Aadhar number must be 12 digits']
+  },
+  panNumber: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    maxlength: [10, 'PAN number must be 10 characters'],
+    validate: {
+      validator: function(v) {
+        return !v || /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v);
+      },
+      message: 'Please provide a valid PAN number (format: ABCDE1234F)'
+    }
+  },
+  bankName: {
+    type: String,
+    trim: true,
+    maxlength: [100, 'Bank name cannot exceed 100 characters']
+  },
+  bankAccountNumber: {
+    type: String,
+    trim: true,
+    maxlength: [20, 'Account number cannot exceed 20 characters']
+  },
+  bankIFSC: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    maxlength: [11, 'IFSC code must be 11 characters'],
+    validate: {
+      validator: function(v) {
+        return !v || /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v);
+      },
+      message: 'Please provide a valid IFSC code (format: ABCD0123456)'
+    }
+  },
   isActive: {
     type: Boolean,
     default: true
