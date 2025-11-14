@@ -1305,12 +1305,35 @@ const AdminDashboard = () => {
     return employees.filter(emp => emp.role !== 'admin');
   };
 
-  const filteredEmployees = filterNonAdmins(employeeStatus).filter(emp => {
-    const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         emp.department.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDepartment = departmentFilter === 'all' || emp.department === departmentFilter;
-    return matchesSearch && matchesDepartment;
-  });
+  // Helper function to convert time string (HH:mm) to minutes for comparison
+  const timeToMinutes = (timeStr) => {
+    if (!timeStr || timeStr === '-') return Infinity; // Put '-' at the end
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const filteredEmployees = filterNonAdmins(employeeStatus)
+    .filter(emp => {
+      const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           emp.department.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesDepartment = departmentFilter === 'all' || emp.department === departmentFilter;
+      return matchesSearch && matchesDepartment;
+    })
+    .sort((a, b) => {
+      // Sort by check-in time first (earliest first)
+      const checkInA = timeToMinutes(a.checkIn);
+      const checkInB = timeToMinutes(b.checkIn);
+      
+      if (checkInA !== checkInB) {
+        return checkInA - checkInB;
+      }
+      
+      // If check-in times are the same, sort by check-out time (earliest first)
+      const checkOutA = timeToMinutes(a.checkOut);
+      const checkOutB = timeToMinutes(b.checkOut);
+      
+      return checkOutA - checkOutB;
+    });
 
   // Employee management functions
   const handleTotalEmployeesClick = () => {
